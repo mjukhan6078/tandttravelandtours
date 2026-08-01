@@ -1,14 +1,18 @@
 "use client";
 
-import { FormEvent, useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import DashboardShell from "@/components/dashboard/DashboardShell";
+import HotelsEditor from "@/components/dashboard/HotelsEditor";
+import ItineraryEditor, { ensureItinerary } from "@/components/dashboard/ItineraryEditor";
+import TripDocumentsPanel from "@/components/dashboard/TripDocumentsPanel";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { Switch } from "@/components/ui/switch";
 import {
   Select,
   SelectContent,
@@ -16,13 +20,33 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
-  DOCUMENT_TYPE_LABELS,
+  endDateFromNights,
+  fitItineraryToNights,
+  itineraryTotalNights,
+  nightsBetween,
+} from "@/lib/dashboard/duration";
+import {
+  FLIGHT_TYPE_LABELS,
+  PAYMENT_STATUS_LABELS,
   TRIP_STATUS_LABELS,
+  VISA_STATUS_LABELS,
+  defaultPayment,
+  defaultTicket,
+  defaultVisa,
   type DocumentType,
+  type FlightType,
+  type PaymentStatus,
+  type TripHotel,
+  type TripPayment,
   type TripStatus,
+  type TripStay,
+  type TripTicket,
+  type TripVisa,
+  type VisaStatus,
 } from "@/lib/dashboard/types";
-import { Copy, FileUp, KeyRound, Trash2, ExternalLink } from "lucide-react";
+import { Copy, KeyRound } from "lucide-react";
 
 type TripDoc = {
   id: string;
@@ -42,10 +66,16 @@ type Trip = {
   destination: string;
   startDate: string;
   endDate: string;
+  itinerary?: TripStay[];
+  itinerarySummary?: string;
   makkahNights: number;
   madinaNights: number;
   notes: string;
   status: TripStatus;
+  ticket?: TripTicket;
+  visa?: TripVisa;
+  hotels?: TripHotel[];
+  payment?: TripPayment;
   documents: TripDoc[];
   apiKey?: string | null;
   apiKeyCreatedAt?: string | null;
@@ -57,13 +87,42 @@ export default function TripDetailPage() {
   const tripId = params.id;
 
   const [trip, setTrip] = useState<Trip | null>(null);
+  const [clientName, setClientName] = useState("");
+  const [clientPhone, setClientPhone] = useState("");
+  const [clientEmail, setClientEmail] = useState("");
+  const [destination, setDestination] = useState("");
+  const [status, setStatus] = useState<TripStatus>("draft");
+  const [notes, setNotes] = useState("");
+  const [itinerary, setItinerary] = useState<TripStay[]>([]);
+  const [startDate, setStartDate] = useState("");
+  const [endDate, setEndDate] = useState("");
+  const [ticket, setTicket] = useState<TripTicket>(defaultTicket());
+  const [visa, setVisa] = useState<TripVisa>(defaultVisa());
+  const [hotels, setHotels] = useState<TripHotel[]>([]);
+  const [payment, setPayment] = useState<TripPayment>(defaultPayment());
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
-  const [docType, setDocType] = useState<DocumentType>("visa");
-  const [uploading, setUploading] = useState(false);
   const [revealedKey, setRevealedKey] = useState<string | null>(null);
+
+  const applyTrip = (data: Trip) => {
+    setTrip(data);
+    setClientName(data.clientName || "");
+    setClientPhone(data.clientPhone || "");
+    setClientEmail(data.clientEmail || "");
+    setDestination(data.destination || "");
+    setStatus(data.status || "draft");
+    setNotes(data.notes || "");
+    setItinerary(ensureItinerary(data.itinerary));
+    setStartDate(data.startDate || "");
+    setEndDate(data.endDate || "");
+    setTicket({ ...defaultTicket(), ...(data.ticket || {}) });
+    setVisa({ ...defaultVisa(), ...(data.visa || {}) });
+    setHotels(Array.isArray(data.hotels) ? data.hotels : []);
+    setPayment({ ...defaultPayment(), ...(data.payment || {}) });
+    setRevealedKey(data.apiKey || null);
+  };
 
   const loadTrip = useCallback(async () => {
     const response = await fetch(`/api/dashboard/trips/${tripId}`);
@@ -72,8 +131,7 @@ export default function TripDetailPage() {
       setError(data.error || "Trip not found");
       setTrip(null);
     } else {
-      setTrip(data.trip);
-      setRevealedKey(data.trip.apiKey || null);
+      applyTrip(data.trip);
     }
     setLoading(false);
   }, [tripId]);
@@ -82,27 +140,64 @@ export default function TripDetailPage() {
     loadTrip();
   }, [loadTrip]);
 
-  const saveTrip = async (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
+  const syncStaysToDates = (nextStart: string, nextEnd: string, currentStays: TripStay[]) => {
+    const stays = ensureItinerary(currentStays);
+    if (!nextStart || !nextEnd) return stays;
+    const nights = nightsBetween(nextStart, nextEnd);
+    if (nights <= 0) {
+      const fallbackEnd = endDateFromNights(nextStart, itineraryTotalNights(stays));
+      setEndDate(fallbackEnd);
+      return stays;
+    }
+    return fitItineraryToNights(stays, nights);
+  };
+
+  const handleStartDateChange = (value: string) => {
+    setStartDate(value);
+    if (!value) return;
+    if (endDate) {
+      setItinerary(syncStaysToDates(value, endDate, itinerary));
+    } else {
+      setEndDate(endDateFromNights(value, itineraryTotalNights(ensureItinerary(itinerary))));
+    }
+  };
+
+  const handleEndDateChange = (value: string) => {
+    setEndDate(value);
+    if (!startDate || !value) return;
+    setItinerary(syncStaysToDates(startDate, value, itinerary));
+  };
+
+  const handleItineraryChange = (next: TripStay[]) => {
+    const stays = ensureItinerary(next);
+    setItinerary(stays);
+    if (startDate) {
+      setEndDate(endDateFromNights(startDate, itineraryTotalNights(stays)));
+    }
+  };
+
+  const saveTrip = async () => {
     if (!trip) return;
     setSaving(true);
     setMessage("");
     setError("");
-    const form = new FormData(event.currentTarget);
     const response = await fetch(`/api/dashboard/trips/${trip.id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        clientName: form.get("clientName"),
-        clientPhone: form.get("clientPhone"),
-        clientEmail: form.get("clientEmail"),
-        destination: form.get("destination"),
-        startDate: form.get("startDate"),
-        endDate: form.get("endDate"),
-        makkahNights: Number(form.get("makkahNights") || 0),
-        madinaNights: Number(form.get("madinaNights") || 0),
-        notes: form.get("notes"),
-        status: trip.status,
+        clientName,
+        clientPhone,
+        clientEmail,
+        destination,
+        startDate,
+        endDate,
+        itinerary: ensureItinerary(itinerary),
+        notes,
+        status,
+        ticket,
+        visa,
+        hotels,
+        payment,
       }),
     });
     const data = await response.json();
@@ -111,37 +206,8 @@ export default function TripDetailPage() {
       setError(data.error || "Save failed");
       return;
     }
-    setTrip(data.trip);
+    applyTrip(data.trip);
     setMessage("Trip saved");
-  };
-
-  const uploadDocument = async (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    if (!trip) return;
-    setUploading(true);
-    setError("");
-    const formEl = event.currentTarget;
-    const form = new FormData(formEl);
-    form.set("type", docType);
-    const response = await fetch(`/api/dashboard/trips/${trip.id}/documents`, {
-      method: "POST",
-      body: form,
-    });
-    const data = await response.json();
-    setUploading(false);
-    if (!response.ok) {
-      setError(data.error || "Upload failed");
-      return;
-    }
-    formEl.reset();
-    await loadTrip();
-    setMessage("Document uploaded");
-  };
-
-  const deleteDocument = async (docId: string) => {
-    if (!trip || !confirm("Delete this document?")) return;
-    await fetch(`/api/dashboard/trips/${trip.id}/documents/${docId}`, { method: "DELETE" });
-    await loadTrip();
   };
 
   const generateApiKey = async () => {
@@ -212,232 +278,555 @@ export default function TripDetailPage() {
 
   return (
     <DashboardShell
-      title={trip.clientName}
+      title={clientName || trip.clientName}
       actions={
-        <Button asChild variant="outline" size="sm">
-          <Link href="/dashboard">All trips</Link>
-        </Button>
+        <div className="flex flex-wrap gap-2">
+          <Button asChild variant="outline" size="sm">
+            <Link href="/dashboard">All trips</Link>
+          </Button>
+          <Button size="sm" onClick={saveTrip} disabled={saving}>
+            {saving ? "Saving…" : "Save changes"}
+          </Button>
+        </div>
       }
     >
-      <div className="space-y-6">
+      <div className="space-y-4">
         {(message || error) && (
           <p className={`text-sm ${error ? "text-destructive" : "text-primary"}`}>
             {error || message}
           </p>
         )}
 
-        <Card className="border-primary/10">
-          <CardHeader>
-            <CardTitle>Trip details</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <form onSubmit={saveTrip} className="space-y-4">
-              <div className="grid sm:grid-cols-2 gap-4">
-                <div className="space-y-2 sm:col-span-2">
-                  <Label htmlFor="clientName">Client name</Label>
-                  <Input id="clientName" name="clientName" defaultValue={trip.clientName} required />
+        <Tabs defaultValue="personal">
+          <TabsList>
+            <TabsTrigger value="personal">Personal info</TabsTrigger>
+            <TabsTrigger value="duration">Trip duration</TabsTrigger>
+            <TabsTrigger value="ticket">Ticket</TabsTrigger>
+            <TabsTrigger value="visa">Visa</TabsTrigger>
+            <TabsTrigger value="hotel">Hotel</TabsTrigger>
+            <TabsTrigger value="payment">Payment</TabsTrigger>
+            <TabsTrigger value="api">API key</TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="personal">
+            <Card className="border-primary/10">
+              <CardHeader>
+                <CardTitle>Personal info</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="grid sm:grid-cols-2 gap-4">
+                  <div className="space-y-2 sm:col-span-2">
+                    <Label htmlFor="clientName">Client name</Label>
+                    <Input
+                      id="clientName"
+                      value={clientName}
+                      onChange={(e) => setClientName(e.target.value)}
+                      required
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="clientPhone">Phone</Label>
+                    <Input
+                      id="clientPhone"
+                      value={clientPhone}
+                      onChange={(e) => setClientPhone(e.target.value)}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="clientEmail">Email</Label>
+                    <Input
+                      id="clientEmail"
+                      type="email"
+                      value={clientEmail}
+                      onChange={(e) => setClientEmail(e.target.value)}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="destination">Destination</Label>
+                    <Input
+                      id="destination"
+                      value={destination}
+                      onChange={(e) => setDestination(e.target.value)}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Status</Label>
+                    <Select value={status} onValueChange={(v) => setStatus(v as TripStatus)}>
+                      <SelectTrigger className="w-full">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {Object.entries(TRIP_STATUS_LABELS).map(([value, label]) => (
+                          <SelectItem key={value} value={value}>
+                            {label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2 sm:col-span-2">
+                    <Label htmlFor="notes">Notes</Label>
+                    <Textarea
+                      id="notes"
+                      rows={3}
+                      value={notes}
+                      onChange={(e) => setNotes(e.target.value)}
+                    />
+                  </div>
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="clientPhone">Phone</Label>
-                  <Input id="clientPhone" name="clientPhone" defaultValue={trip.clientPhone} />
+                <div className="flex flex-wrap gap-2">
+                  <Button type="button" onClick={saveTrip} disabled={saving}>
+                    {saving ? "Saving…" : "Save changes"}
+                  </Button>
+                  <Button type="button" variant="destructive" onClick={deleteTrip}>
+                    Delete trip
+                  </Button>
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="clientEmail">Email</Label>
-                  <Input id="clientEmail" name="clientEmail" type="email" defaultValue={trip.clientEmail} />
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="duration">
+            <Card className="border-primary/10">
+              <CardHeader>
+                <CardTitle>Trip duration</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="grid sm:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="startDate">Start date</Label>
+                    <Input
+                      id="startDate"
+                      type="date"
+                      value={startDate}
+                      onChange={(e) => handleStartDateChange(e.target.value)}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="endDate">End date</Label>
+                    <Input
+                      id="endDate"
+                      type="date"
+                      value={endDate}
+                      min={startDate || undefined}
+                      onChange={(e) => handleEndDateChange(e.target.value)}
+                    />
+                    {startDate && endDate && (
+                      <p className="text-[11px] text-muted-foreground">
+                        {nightsBetween(startDate, endDate)} night
+                        {nightsBetween(startDate, endDate) === 1 ? "" : "s"} total — stay order
+                        adjusts to fill this duration.
+                      </p>
+                    )}
+                  </div>
+                  <div className="sm:col-span-2">
+                    <ItineraryEditor
+                      value={itinerary}
+                      onChange={handleItineraryChange}
+                      startDate={startDate}
+                      endDate={endDate}
+                      onEndDateChange={setEndDate}
+                    />
+                  </div>
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="destination">Destination</Label>
-                  <Input id="destination" name="destination" defaultValue={trip.destination} />
-                </div>
-                <div className="space-y-2">
-                  <Label>Status</Label>
-                  <Select
-                    value={trip.status}
-                    onValueChange={(v) => setTrip({ ...trip, status: v as TripStatus })}
-                  >
-                    <SelectTrigger className="w-full">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {Object.entries(TRIP_STATUS_LABELS).map(([value, label]) => (
-                        <SelectItem key={value} value={value}>
-                          {label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="startDate">Start date</Label>
-                  <Input id="startDate" name="startDate" type="date" defaultValue={trip.startDate} />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="endDate">End date</Label>
-                  <Input id="endDate" name="endDate" type="date" defaultValue={trip.endDate} />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="makkahNights">Makkah nights</Label>
-                  <Input
-                    id="makkahNights"
-                    name="makkahNights"
-                    type="number"
-                    min={0}
-                    defaultValue={trip.makkahNights}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="madinaNights">Madina nights</Label>
-                  <Input
-                    id="madinaNights"
-                    name="madinaNights"
-                    type="number"
-                    min={0}
-                    defaultValue={trip.madinaNights}
-                  />
-                </div>
-                <div className="space-y-2 sm:col-span-2">
-                  <Label htmlFor="notes">Notes</Label>
-                  <Textarea id="notes" name="notes" rows={3} defaultValue={trip.notes} />
-                </div>
-              </div>
-              <div className="flex flex-wrap gap-2">
-                <Button type="submit" disabled={saving}>
+                <Button type="button" onClick={saveTrip} disabled={saving}>
                   {saving ? "Saving…" : "Save changes"}
                 </Button>
-                <Button type="button" variant="destructive" onClick={deleteTrip}>
-                  Delete trip
-                </Button>
-              </div>
-            </form>
-          </CardContent>
-        </Card>
+              </CardContent>
+            </Card>
+          </TabsContent>
 
-        <Card className="border-primary/10">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <FileUp className="h-5 w-5 text-secondary" />
-              Documents
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-6">
-            <form onSubmit={uploadDocument} className="grid sm:grid-cols-[1fr_1fr_1.4fr_auto] gap-3 items-end">
-              <div className="space-y-2">
-                <Label>Type</Label>
-                <Select value={docType} onValueChange={(v) => setDocType(v as DocumentType)}>
-                  <SelectTrigger className="w-full">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {Object.entries(DOCUMENT_TYPE_LABELS).map(([value, label]) => (
-                      <SelectItem key={value} value={value}>
-                        {label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="title">Title</Label>
-                <Input id="title" name="title" placeholder="e.g. Umrah visa" />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="file">File</Label>
-                <Input id="file" name="file" type="file" required />
-              </div>
-              <Button type="submit" disabled={uploading}>
-                {uploading ? "Uploading…" : "Upload"}
-              </Button>
-            </form>
-
-            {trip.documents.length === 0 ? (
-              <p className="text-sm text-muted-foreground">
-                No documents yet. Upload visa, ticket, hotel, transport, or payment receipt.
-              </p>
-            ) : (
-              <ul className="divide-y divide-border rounded-lg border border-border">
-                {trip.documents.map((doc) => (
-                  <li key={doc.id} className="flex items-center justify-between gap-3 px-4 py-3">
-                    <div className="min-w-0">
-                      <p className="font-medium truncate">{doc.title}</p>
-                      <p className="text-xs text-muted-foreground">
-                        {DOCUMENT_TYPE_LABELS[doc.type]} · {doc.fileName} ·{" "}
-                        {Math.round(doc.size / 1024)} KB
-                      </p>
+          <TabsContent value="ticket">
+            <Card className="border-primary/10">
+              <CardHeader>
+                <CardTitle>Ticket</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                <div className="grid sm:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label>Airline / flight</Label>
+                    <Input
+                      value={ticket.airline}
+                      onChange={(e) => setTicket({ ...ticket, airline: e.target.value })}
+                      placeholder="e.g. Saudi Airlines"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Flight number</Label>
+                    <Input
+                      value={ticket.flightNumber}
+                      onChange={(e) => setTicket({ ...ticket, flightNumber: e.target.value })}
+                      placeholder="e.g. SV 724"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Departure airport</Label>
+                    <Input
+                      value={ticket.departureAirport}
+                      onChange={(e) => setTicket({ ...ticket, departureAirport: e.target.value })}
+                      placeholder="e.g. ISB"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Arrival airport</Label>
+                    <Input
+                      value={ticket.arrivalAirport}
+                      onChange={(e) => setTicket({ ...ticket, arrivalAirport: e.target.value })}
+                      placeholder="e.g. JED"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Take off</Label>
+                    <Input
+                      type="datetime-local"
+                      value={ticket.takeoffAt}
+                      onChange={(e) => setTicket({ ...ticket, takeoffAt: e.target.value })}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Flight type</Label>
+                    <Select
+                      value={ticket.flightType}
+                      onValueChange={(v) =>
+                        setTicket({ ...ticket, flightType: v as FlightType })
+                      }
+                    >
+                      <SelectTrigger className="w-full">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {Object.entries(FLIGHT_TYPE_LABELS).map(([value, label]) => (
+                          <SelectItem key={value} value={value}>
+                            {label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Ticket price</Label>
+                    <Input
+                      value={ticket.ticketPrice}
+                      onChange={(e) => setTicket({ ...ticket, ticketPrice: e.target.value })}
+                      placeholder="e.g. 185000"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Currency</Label>
+                    <Input
+                      value={ticket.currency}
+                      onChange={(e) => setTicket({ ...ticket, currency: e.target.value })}
+                    />
+                  </div>
+                  <div className="space-y-2 sm:col-span-2">
+                    <Label>Luggage allowance</Label>
+                    <Input
+                      value={ticket.luggageAllowance}
+                      onChange={(e) => setTicket({ ...ticket, luggageAllowance: e.target.value })}
+                      placeholder="e.g. 2 × 23kg + 7kg cabin"
+                    />
+                  </div>
+                  <label className="flex items-center justify-between gap-3 rounded-md border border-border px-3 py-2 sm:col-span-2">
+                    <span className="text-sm">Meal included</span>
+                    <Switch
+                      checked={ticket.mealIncluded}
+                      onCheckedChange={(checked) =>
+                        setTicket({ ...ticket, mealIncluded: checked })
+                      }
+                    />
+                  </label>
+                  {ticket.flightType === "connecting" && (
+                    <div className="space-y-2 sm:col-span-2">
+                      <Label>Connecting stay / layover</Label>
+                      <Textarea
+                        rows={2}
+                        value={ticket.connectingStay}
+                        onChange={(e) =>
+                          setTicket({ ...ticket, connectingStay: e.target.value })
+                        }
+                        placeholder="e.g. 4h layover in DXB, terminal 3"
+                      />
                     </div>
-                    <div className="flex items-center gap-2 shrink-0">
-                      <Button asChild variant="outline" size="sm">
-                        <a
-                          href={`/api/dashboard/trips/${trip.id}/documents/${doc.id}`}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                        >
-                          <ExternalLink className="h-3.5 w-3.5" />
-                        </a>
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="text-destructive"
-                        onClick={() => deleteDocument(doc.id)}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </CardContent>
-        </Card>
-
-        <Card className="border-secondary/30">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <KeyRound className="h-5 w-5 text-secondary" />
-              Client API key
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <p className="text-sm text-muted-foreground">
-              Create an API key for this client so they can view their trip plan from another app.
-            </p>
-
-            {revealedKey ? (
-              <div className="rounded-lg border border-border bg-muted/40 p-3 space-y-2">
-                <code className="block text-xs sm:text-sm break-all font-mono">{revealedKey}</code>
-                <div className="flex flex-wrap gap-2">
-                  <Button type="button" size="sm" variant="outline" onClick={copyKey}>
-                    <Copy className="h-3.5 w-3.5 mr-1.5" />
-                    Copy key
-                  </Button>
-                  <Button type="button" size="sm" variant="destructive" onClick={revokeApiKey}>
-                    Revoke
-                  </Button>
+                  )}
+                  <div className="space-y-2 sm:col-span-2">
+                    <Label>Ticket notes</Label>
+                    <Textarea
+                      rows={2}
+                      value={ticket.notes}
+                      onChange={(e) => setTicket({ ...ticket, notes: e.target.value })}
+                    />
+                  </div>
                 </div>
-              </div>
-            ) : (
-              <p className="text-sm text-muted-foreground">No API key yet.</p>
-            )}
 
-            <Button type="button" onClick={generateApiKey}>
-              {trip.apiKey ? "Rotate API key" : "Create API key"}
-            </Button>
+                <TripDocumentsPanel
+                  tripId={trip.id}
+                  type="ticket"
+                  documents={trip.documents}
+                  onChanged={loadTrip}
+                  titlePlaceholder="e.g. Outbound e-ticket"
+                />
 
-            <div className="rounded-lg bg-primary/5 border border-primary/10 p-4 text-sm space-y-2">
-              <p className="font-medium">Client API usage</p>
-              <pre className="overflow-x-auto text-xs bg-background rounded-md p-3 border border-border whitespace-pre-wrap">{`GET ${origin}/api/v1/trip
+                <Button type="button" onClick={saveTrip} disabled={saving}>
+                  {saving ? "Saving…" : "Save changes"}
+                </Button>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="visa">
+            <Card className="border-primary/10">
+              <CardHeader>
+                <CardTitle>Visa</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                <div className="grid sm:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label>Visa status</Label>
+                    <Select
+                      value={visa.status}
+                      onValueChange={(v) => setVisa({ ...visa, status: v as VisaStatus })}
+                    >
+                      <SelectTrigger className="w-full">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {Object.entries(VISA_STATUS_LABELS).map(([value, label]) => (
+                          <SelectItem key={value} value={value}>
+                            {label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Vendor applied with</Label>
+                    <Input
+                      value={visa.vendor}
+                      onChange={(e) => setVisa({ ...visa, vendor: e.target.value })}
+                      placeholder="e.g. Nusuk / agency name"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Visa cost</Label>
+                    <Input
+                      value={visa.cost}
+                      onChange={(e) => setVisa({ ...visa, cost: e.target.value })}
+                      placeholder="e.g. 45000"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Currency</Label>
+                    <Input
+                      value={visa.currency}
+                      onChange={(e) => setVisa({ ...visa, currency: e.target.value })}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Valid from</Label>
+                    <Input
+                      type="date"
+                      value={visa.validFrom}
+                      onChange={(e) => setVisa({ ...visa, validFrom: e.target.value })}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Valid to</Label>
+                    <Input
+                      type="date"
+                      value={visa.validTo}
+                      onChange={(e) => setVisa({ ...visa, validTo: e.target.value })}
+                    />
+                  </div>
+                  <label className="flex items-center justify-between gap-3 rounded-md border border-border px-3 py-2 sm:col-span-2">
+                    <span className="text-sm">Transport included with visa</span>
+                    <Switch
+                      checked={visa.transportIncluded}
+                      onCheckedChange={(checked) =>
+                        setVisa({ ...visa, transportIncluded: checked })
+                      }
+                    />
+                  </label>
+                  <div className="space-y-2 sm:col-span-2">
+                    <Label>Visa notes</Label>
+                    <Textarea
+                      rows={2}
+                      value={visa.notes}
+                      onChange={(e) => setVisa({ ...visa, notes: e.target.value })}
+                    />
+                  </div>
+                </div>
+
+                <TripDocumentsPanel
+                  tripId={trip.id}
+                  type="visa"
+                  documents={trip.documents}
+                  onChanged={loadTrip}
+                  titlePlaceholder="e.g. Umrah visa copy"
+                />
+
+                <Button type="button" onClick={saveTrip} disabled={saving}>
+                  {saving ? "Saving…" : "Save changes"}
+                </Button>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="hotel">
+            <Card className="border-primary/10">
+              <CardHeader>
+                <CardTitle>Hotel</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                <HotelsEditor value={hotels} onChange={setHotels} />
+                <TripDocumentsPanel
+                  tripId={trip.id}
+                  type="hotel"
+                  documents={trip.documents}
+                  onChanged={loadTrip}
+                  titlePlaceholder="e.g. Makkah hotel voucher"
+                />
+                <Button type="button" onClick={saveTrip} disabled={saving}>
+                  {saving ? "Saving…" : "Save changes"}
+                </Button>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="payment">
+            <Card className="border-primary/10">
+              <CardHeader>
+                <CardTitle>Payment</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                <div className="grid sm:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label>Total amount</Label>
+                    <Input
+                      value={payment.totalAmount}
+                      onChange={(e) => setPayment({ ...payment, totalAmount: e.target.value })}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Paid amount</Label>
+                    <Input
+                      value={payment.paidAmount}
+                      onChange={(e) => setPayment({ ...payment, paidAmount: e.target.value })}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Currency</Label>
+                    <Input
+                      value={payment.currency}
+                      onChange={(e) => setPayment({ ...payment, currency: e.target.value })}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Payment method</Label>
+                    <Input
+                      value={payment.method}
+                      onChange={(e) => setPayment({ ...payment, method: e.target.value })}
+                      placeholder="e.g. Bank transfer / Cash"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Payment status</Label>
+                    <Select
+                      value={payment.status}
+                      onValueChange={(v) =>
+                        setPayment({ ...payment, status: v as PaymentStatus })
+                      }
+                    >
+                      <SelectTrigger className="w-full">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {Object.entries(PAYMENT_STATUS_LABELS).map(([value, label]) => (
+                          <SelectItem key={value} value={value}>
+                            {label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2 sm:col-span-2">
+                    <Label>Payment notes</Label>
+                    <Textarea
+                      rows={2}
+                      value={payment.notes}
+                      onChange={(e) => setPayment({ ...payment, notes: e.target.value })}
+                    />
+                  </div>
+                </div>
+
+                <TripDocumentsPanel
+                  tripId={trip.id}
+                  type="payment_receipt"
+                  documents={trip.documents}
+                  onChanged={loadTrip}
+                  titlePlaceholder="e.g. Advance payment receipt"
+                />
+
+                <Button type="button" onClick={saveTrip} disabled={saving}>
+                  {saving ? "Saving…" : "Save changes"}
+                </Button>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="api">
+            <Card className="border-secondary/30">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <KeyRound className="h-5 w-5 text-secondary" />
+                  Client API key
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <p className="text-sm text-muted-foreground">
+                  Create an API key for this client so they can view their trip plan from another
+                  app.
+                </p>
+
+                {revealedKey ? (
+                  <div className="rounded-lg border border-border bg-muted/40 p-3 space-y-2">
+                    <code className="block text-xs sm:text-sm break-all font-mono">
+                      {revealedKey}
+                    </code>
+                    <div className="flex flex-wrap gap-2">
+                      <Button type="button" size="sm" variant="outline" onClick={copyKey}>
+                        <Copy className="h-3.5 w-3.5 mr-1.5" />
+                        Copy key
+                      </Button>
+                      <Button type="button" size="sm" variant="destructive" onClick={revokeApiKey}>
+                        Revoke
+                      </Button>
+                    </div>
+                  </div>
+                ) : (
+                  <p className="text-sm text-muted-foreground">No API key yet.</p>
+                )}
+
+                <Button type="button" onClick={generateApiKey}>
+                  {trip.apiKey ? "Rotate API key" : "Create API key"}
+                </Button>
+
+                <div className="rounded-lg bg-primary/5 border border-primary/10 p-4 text-sm space-y-2">
+                  <p className="font-medium">Client API usage</p>
+                  <pre className="overflow-x-auto text-xs bg-background rounded-md p-3 border border-border whitespace-pre-wrap">{`GET ${origin}/api/v1/trip
 Authorization: Bearer ${revealedKey || "<API_KEY>"}
 
 # or
 curl -H "X-API-Key: ${revealedKey || "<API_KEY>"}" \\
   ${origin}/api/v1/trip`}</pre>
-              <p className="text-xs text-muted-foreground">
-                Document downloads:{" "}
-                <code>/api/v1/documents/&lt;documentId&gt;</code> with the same API key.
-              </p>
-            </div>
-          </CardContent>
-        </Card>
+                  <p className="text-xs text-muted-foreground">
+                    Document downloads:{" "}
+                    <code>/api/v1/documents/&lt;documentId&gt;</code> with the same API key.
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+        </Tabs>
       </div>
     </DashboardShell>
   );

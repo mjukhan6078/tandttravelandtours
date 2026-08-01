@@ -14,6 +14,8 @@ type TripRow = {
   destination: string;
   startDate: string;
   endDate: string;
+  itinerarySummary?: string;
+  totalNights?: number;
   status: TripStatus;
   apiKey?: string | null;
   documents: { id: string }[];
@@ -67,6 +69,9 @@ export default function DashboardHomePage() {
                       {trip.startDate ? ` · ${trip.startDate}` : ""}
                       {trip.endDate ? ` → ${trip.endDate}` : ""}
                     </p>
+                    {trip.itinerarySummary && (
+                      <p className="text-sm text-foreground/80 mt-1">{trip.itinerarySummary}</p>
+                    )}
                   </div>
                   <span className="text-xs rounded-full bg-primary/10 text-primary px-2.5 py-1 font-medium">
                     {TRIP_STATUS_LABELS[trip.status]}

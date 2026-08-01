@@ -4,6 +4,7 @@ import { FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import DashboardShell from "@/components/dashboard/DashboardShell";
+import ItineraryEditor, { ensureItinerary } from "@/components/dashboard/ItineraryEditor";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -16,28 +17,79 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { TRIP_STATUS_LABELS, type TripStatus } from "@/lib/dashboard/types";
+import {
+  endDateFromNights,
+  fitItineraryToNights,
+  itineraryTotalNights,
+  nightsBetween,
+} from "@/lib/dashboard/duration";
+import { defaultItinerary, TRIP_STATUS_LABELS, type TripStatus, type TripStay } from "@/lib/dashboard/types";
 
 export default function NewTripPage() {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [status, setStatus] = useState<TripStatus>("draft");
+  const [startDate, setStartDate] = useState("");
+  const [endDate, setEndDate] = useState("");
+  const [itinerary, setItinerary] = useState<TripStay[]>(defaultItinerary());
+
+  const syncStaysToDates = (nextStart: string, nextEnd: string, currentStays: TripStay[]) => {
+    const stays = ensureItinerary(currentStays);
+    if (!nextStart || !nextEnd) return stays;
+    const nights = nightsBetween(nextStart, nextEnd);
+    if (nights <= 0) {
+      const fallbackEnd = endDateFromNights(nextStart, itineraryTotalNights(stays));
+      setEndDate(fallbackEnd);
+      return stays;
+    }
+    return fitItineraryToNights(stays, nights);
+  };
+
+  const handleStartDateChange = (value: string) => {
+    setStartDate(value);
+    if (!value) return;
+    if (endDate) {
+      setItinerary(syncStaysToDates(value, endDate, itinerary));
+    } else {
+      setEndDate(endDateFromNights(value, itineraryTotalNights(ensureItinerary(itinerary))));
+    }
+  };
+
+  const handleEndDateChange = (value: string) => {
+    setEndDate(value);
+    if (!startDate || !value) return;
+    setItinerary(syncStaysToDates(startDate, value, itinerary));
+  };
+
+  const handleItineraryChange = (next: TripStay[]) => {
+    const stays = ensureItinerary(next);
+    setItinerary(stays);
+    if (startDate) {
+      setEndDate(endDateFromNights(startDate, itineraryTotalNights(stays)));
+    }
+  };
 
   const onSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setLoading(true);
     setError("");
     const form = new FormData(event.currentTarget);
+    const stays = ensureItinerary(itinerary);
+    const finalEnd =
+      endDate ||
+      (startDate ? endDateFromNights(startDate, itineraryTotalNights(stays)) : "");
     const payload = {
       clientName: String(form.get("clientName") || ""),
       clientPhone: String(form.get("clientPhone") || ""),
       clientEmail: String(form.get("clientEmail") || ""),
       destination: String(form.get("destination") || "Umrah"),
-      startDate: String(form.get("startDate") || ""),
-      endDate: String(form.get("endDate") || ""),
-      makkahNights: Number(form.get("makkahNights") || 0),
-      madinaNights: Number(form.get("madinaNights") || 0),
+      startDate,
+      endDate: finalEnd,
+      itinerary:
+        startDate && finalEnd
+          ? fitItineraryToNights(stays, nightsBetween(startDate, finalEnd) || itineraryTotalNights(stays))
+          : stays,
       notes: String(form.get("notes") || ""),
       status,
     };
@@ -107,19 +159,40 @@ export default function NewTripPage() {
               </div>
               <div className="space-y-2">
                 <Label htmlFor="startDate">Start date</Label>
-                <Input id="startDate" name="startDate" type="date" />
+                <Input
+                  id="startDate"
+                  name="startDate"
+                  type="date"
+                  value={startDate}
+                  onChange={(e) => handleStartDateChange(e.target.value)}
+                />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="endDate">End date</Label>
-                <Input id="endDate" name="endDate" type="date" />
+                <Input
+                  id="endDate"
+                  name="endDate"
+                  type="date"
+                  value={endDate}
+                  min={startDate || undefined}
+                  onChange={(e) => handleEndDateChange(e.target.value)}
+                />
+                {startDate && endDate && (
+                  <p className="text-[11px] text-muted-foreground">
+                    {nightsBetween(startDate, endDate)} night
+                    {nightsBetween(startDate, endDate) === 1 ? "" : "s"} — stay order fills this
+                    duration.
+                  </p>
+                )}
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="makkahNights">Makkah nights</Label>
-                <Input id="makkahNights" name="makkahNights" type="number" min={0} defaultValue={5} />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="madinaNights">Madina nights</Label>
-                <Input id="madinaNights" name="madinaNights" type="number" min={0} defaultValue={5} />
+              <div className="sm:col-span-2">
+                <ItineraryEditor
+                  value={itinerary}
+                  onChange={handleItineraryChange}
+                  startDate={startDate}
+                  endDate={endDate}
+                  onEndDateChange={setEndDate}
+                />
               </div>
               <div className="space-y-2 sm:col-span-2">
                 <Label htmlFor="notes">Notes</Label>

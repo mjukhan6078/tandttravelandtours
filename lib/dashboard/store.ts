@@ -1,5 +1,17 @@
 import { randomBytes } from "crypto";
-import type { DashboardData, DocumentType, Trip, TripDocument, TripStatus } from "./types";
+import type {
+  DashboardData,
+  DocumentType,
+  Trip,
+  TripDocument,
+  TripHotel,
+  TripPayment,
+  TripStatus,
+  TripStay,
+  TripTicket,
+  TripVisa,
+} from "./types";
+import { defaultPayment, defaultTicket, defaultVisa } from "./types";
 import {
   META_KEY,
   deleteObject,
@@ -9,6 +21,16 @@ import {
   objectKeyForDocument,
   putObject,
 } from "./minio";
+import {
+  buildStaySchedule,
+  endDateFromItinerary,
+  itinerarySummary,
+  normalizeTrip,
+  sanitizeItinerary,
+  stayTotals,
+} from "./itinerary";
+import { fitItineraryToNights, nightsBetween } from "./duration";
+import { sanitizeHotels, sanitizePayment, sanitizeTicket, sanitizeVisa } from "./trip-details";
 
 async function readData(): Promise<DashboardData> {
   const raw = await getObjectText(META_KEY);
@@ -17,7 +39,9 @@ async function readData(): Promise<DashboardData> {
     await writeData(initial);
     return initial;
   }
-  return JSON.parse(raw) as DashboardData;
+  const parsed = JSON.parse(raw) as DashboardData;
+  parsed.trips = (parsed.trips || []).map((trip) => normalizeTrip(trip as Trip));
+  return parsed;
 }
 
 async function writeData(data: DashboardData) {
@@ -45,12 +69,14 @@ export async function listTrips() {
 
 export async function getTrip(id: string) {
   const data = await readData();
-  return data.trips.find((trip) => trip.id === id) ?? null;
+  const trip = data.trips.find((item) => item.id === id) ?? null;
+  return trip ? normalizeTrip(trip) : null;
 }
 
 export async function getTripByApiKey(apiKey: string) {
   const data = await readData();
-  return data.trips.find((trip) => trip.apiKey === apiKey) ?? null;
+  const trip = data.trips.find((item) => item.apiKey === apiKey) ?? null;
+  return trip ? normalizeTrip(trip) : null;
 }
 
 export type CreateTripInput = {
@@ -60,27 +86,70 @@ export type CreateTripInput = {
   destination?: string;
   startDate?: string;
   endDate?: string;
+  itinerary?: TripStay[];
   makkahNights?: number;
   madinaNights?: number;
   notes?: string;
   status?: TripStatus;
+  ticket?: TripTicket;
+  visa?: TripVisa;
+  hotels?: TripHotel[];
+  payment?: TripPayment;
 };
+
+function applyItineraryFields(input: Partial<CreateTripInput>, startDate: string) {
+  let itinerary = sanitizeItinerary(
+    input.itinerary ?? [
+      ...(Number(input.makkahNights) > 0
+        ? [{ id: newId("stay"), city: "makkah" as const, nights: Number(input.makkahNights) }]
+        : []),
+      ...(Number(input.madinaNights) > 0
+        ? [{ id: newId("stay"), city: "madina" as const, nights: Number(input.madinaNights) }]
+        : []),
+    ]
+  );
+
+  const requestedEnd = input.endDate?.trim() || "";
+  if (startDate && requestedEnd) {
+    const duration = nightsBetween(startDate, requestedEnd);
+    if (duration > 0) {
+      itinerary = fitItineraryToNights(itinerary, duration);
+    }
+  }
+
+  const totals = stayTotals(itinerary);
+  const computedEnd = endDateFromItinerary(startDate, itinerary);
+  return {
+    itinerary,
+    makkahNights: totals.makkahNights,
+    madinaNights: totals.madinaNights,
+    endDate: requestedEnd || computedEnd || "",
+  };
+}
 
 export async function createTrip(input: CreateTripInput) {
   const data = await readData();
   const stamp = nowIso();
+  const startDate = input.startDate || "";
+  const stay = applyItineraryFields(input, startDate);
+
   const trip: Trip = {
     id: newId("trip"),
     clientName: input.clientName.trim(),
     clientPhone: input.clientPhone?.trim() || "",
     clientEmail: input.clientEmail?.trim() || "",
     destination: input.destination?.trim() || "Umrah",
-    startDate: input.startDate || "",
-    endDate: input.endDate || "",
-    makkahNights: Number(input.makkahNights) || 0,
-    madinaNights: Number(input.madinaNights) || 0,
+    startDate,
+    endDate: stay.endDate,
+    itinerary: stay.itinerary,
+    makkahNights: stay.makkahNights,
+    madinaNights: stay.madinaNights,
     notes: input.notes?.trim() || "",
     status: input.status || "draft",
+    ticket: sanitizeTicket(input.ticket ?? defaultTicket()),
+    visa: sanitizeVisa(input.visa ?? defaultVisa()),
+    hotels: sanitizeHotels(input.hotels ?? []),
+    payment: sanitizePayment(input.payment ?? defaultPayment()),
     documents: [],
     apiKey: null,
     apiKeyCreatedAt: null,
@@ -97,21 +166,38 @@ export async function updateTrip(id: string, patch: Partial<CreateTripInput>) {
   const index = data.trips.findIndex((trip) => trip.id === id);
   if (index < 0) return null;
 
-  const current = data.trips[index];
+  const current = normalizeTrip(data.trips[index]);
+  const startDate = patch.startDate ?? current.startDate;
+  const nextItinerary =
+    patch.itinerary !== undefined
+      ? applyItineraryFields(patch, startDate)
+      : {
+          itinerary: current.itinerary,
+          makkahNights: current.makkahNights,
+          madinaNights: current.madinaNights,
+          endDate:
+            patch.endDate ??
+            endDateFromItinerary(startDate, current.itinerary) ??
+            current.endDate,
+        };
+
   data.trips[index] = {
     ...current,
     clientName: patch.clientName?.trim() ?? current.clientName,
     clientPhone: patch.clientPhone?.trim() ?? current.clientPhone,
     clientEmail: patch.clientEmail?.trim() ?? current.clientEmail,
     destination: patch.destination?.trim() ?? current.destination,
-    startDate: patch.startDate ?? current.startDate,
-    endDate: patch.endDate ?? current.endDate,
-    makkahNights:
-      patch.makkahNights !== undefined ? Number(patch.makkahNights) || 0 : current.makkahNights,
-    madinaNights:
-      patch.madinaNights !== undefined ? Number(patch.madinaNights) || 0 : current.madinaNights,
+    startDate,
+    endDate: patch.endDate || nextItinerary.endDate || current.endDate,
+    itinerary: nextItinerary.itinerary,
+    makkahNights: nextItinerary.makkahNights,
+    madinaNights: nextItinerary.madinaNights,
     notes: patch.notes?.trim() ?? current.notes,
     status: patch.status ?? current.status,
+    ticket: patch.ticket !== undefined ? sanitizeTicket(patch.ticket) : current.ticket,
+    visa: patch.visa !== undefined ? sanitizeVisa(patch.visa) : current.visa,
+    hotels: patch.hotels !== undefined ? sanitizeHotels(patch.hotels) : current.hotels,
+    payment: patch.payment !== undefined ? sanitizePayment(patch.payment) : current.payment,
     updatedAt: nowIso(),
   };
   await writeData(data);
@@ -194,7 +280,7 @@ export async function createOrRotateApiKey(tripId: string) {
   trip.apiKeyCreatedAt = nowIso();
   trip.updatedAt = nowIso();
   await writeData(data);
-  return trip;
+  return normalizeTrip(trip);
 }
 
 export async function revokeApiKey(tripId: string) {
@@ -206,7 +292,7 @@ export async function revokeApiKey(tripId: string) {
   trip.apiKeyCreatedAt = null;
   trip.updatedAt = nowIso();
   await writeData(data);
-  return trip;
+  return normalizeTrip(trip);
 }
 
 export async function getDocumentBytes(tripId: string, storedName: string) {
@@ -214,20 +300,33 @@ export async function getDocumentBytes(tripId: string, storedName: string) {
 }
 
 export function toPublicTrip(trip: Trip, options?: { includeApiKey?: boolean }) {
+  const normalized = normalizeTrip(trip);
+  const totals = stayTotals(normalized.itinerary);
+  const schedule = buildStaySchedule(normalized.itinerary, normalized.startDate);
+
   return {
-    id: trip.id,
-    clientName: trip.clientName,
-    clientPhone: trip.clientPhone,
-    clientEmail: trip.clientEmail,
-    destination: trip.destination,
-    startDate: trip.startDate,
-    endDate: trip.endDate,
-    makkahNights: trip.makkahNights,
-    madinaNights: trip.madinaNights,
-    totalNights: trip.makkahNights + trip.madinaNights,
-    notes: trip.notes,
-    status: trip.status,
-    documents: trip.documents.map((doc) => ({
+    id: normalized.id,
+    clientName: normalized.clientName,
+    clientPhone: normalized.clientPhone,
+    clientEmail: normalized.clientEmail,
+    destination: normalized.destination,
+    startDate: normalized.startDate,
+    endDate: normalized.endDate || endDateFromItinerary(normalized.startDate, normalized.itinerary),
+    itinerary: schedule,
+    itinerarySummary: itinerarySummary(normalized.itinerary),
+    makkahNights: totals.makkahNights,
+    madinaNights: totals.madinaNights,
+    totalNights: totals.totalNights,
+    notes: normalized.notes,
+    status: normalized.status,
+    ticket: normalized.ticket,
+    visa: {
+      ...normalized.visa,
+      approved: normalized.visa.status === "approved",
+    },
+    hotels: normalized.hotels,
+    payment: normalized.payment,
+    documents: normalized.documents.map((doc) => ({
       id: doc.id,
       type: doc.type,
       title: doc.title,
@@ -237,9 +336,9 @@ export function toPublicTrip(trip: Trip, options?: { includeApiKey?: boolean }) 
       uploadedAt: doc.uploadedAt,
       downloadUrl: `/api/v1/documents/${doc.id}`,
     })),
-    apiKey: options?.includeApiKey ? trip.apiKey : undefined,
-    apiKeyCreatedAt: options?.includeApiKey ? trip.apiKeyCreatedAt : undefined,
-    createdAt: trip.createdAt,
-    updatedAt: trip.updatedAt,
+    apiKey: options?.includeApiKey ? normalized.apiKey : undefined,
+    apiKeyCreatedAt: options?.includeApiKey ? normalized.apiKeyCreatedAt : undefined,
+    createdAt: normalized.createdAt,
+    updatedAt: normalized.updatedAt,
   };
 }
