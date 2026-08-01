@@ -2,6 +2,7 @@ export const AIRLINE_OPTIONS = [
   { value: "saudia", label: "Saudia" },
   { value: "flynas", label: "flynas" },
   { value: "flyadeal", label: "flyadeal" },
+  { value: "flydubai", label: "flydubai" },
   { value: "emirates", label: "Emirates" },
   { value: "etihad", label: "Etihad" },
   { value: "qatar", label: "Qatar Airways" },

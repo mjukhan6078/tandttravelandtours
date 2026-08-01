@@ -57,7 +57,7 @@ import {
   type TripVisa,
   type VisaStatus,
 } from "@/lib/dashboard/types";
-import { Copy, KeyRound } from "lucide-react";
+import { Copy, FileUp, KeyRound } from "lucide-react";
 
 type TripDoc = {
   id: string;
@@ -116,6 +116,7 @@ export default function TripDetailPage() {
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const [revealedKey, setRevealedKey] = useState<string | null>(null);
+  const [parsingTicket, setParsingTicket] = useState(false);
 
   const applyTrip = (data: Trip) => {
     setTrip(data);
@@ -279,6 +280,51 @@ export default function TripDetailPage() {
     if (!trip || !confirm("Delete this trip and all documents?")) return;
     await fetch(`/api/dashboard/trips/${trip.id}`, { method: "DELETE" });
     router.push("/dashboard");
+  };
+
+  const parseTicketPdf = async (file: File | null) => {
+    if (!trip || !file) return;
+    setParsingTicket(true);
+    setMessage("");
+    setError("");
+    const form = new FormData();
+    form.set("file", file);
+    const response = await fetch(`/api/dashboard/trips/${trip.id}/parse-ticket`, {
+      method: "POST",
+      body: form,
+    });
+    const data = await response.json().catch(() => ({}));
+    setParsingTicket(false);
+    if (!response.ok) {
+      setError(data.error || "Could not parse ticket PDF");
+      return;
+    }
+
+    const parsedTicket = data.parsed?.ticket as TripTicket | undefined;
+    if (!parsedTicket) {
+      setError("No ticket details found in PDF");
+      return;
+    }
+
+    setTicket({
+      ...defaultTicket(),
+      ...parsedTicket,
+      departure: syncSegmentTicketPrice({
+        ...defaultFlightSegment(),
+        ...(parsedTicket.departure || {}),
+      }),
+      arrival: syncSegmentTicketPrice({
+        ...defaultFlightSegment(),
+        ...(parsedTicket.arrival || {}),
+      }),
+      notes: parsedTicket.notes || ticket.notes,
+    });
+
+    if (data.parsed?.clientNameHint && !clientName.trim()) {
+      setClientName(data.parsed.clientNameHint);
+    }
+
+    setMessage(`Ticket details loaded: ${data.parsed?.summary || "OK"}`);
   };
 
   if (loading) {
@@ -468,6 +514,41 @@ export default function TripDetailPage() {
                 <CardTitle>Ticket</CardTitle>
               </CardHeader>
               <CardContent className="space-y-6">
+                <div className="rounded-lg border border-dashed border-border bg-muted/20 p-4 space-y-3">
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div>
+                      <p className="text-sm font-semibold flex items-center gap-2">
+                        <FileUp className="h-4 w-4 text-secondary" />
+                        Import ticket PDF
+                      </p>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Upload a Galileo e-ticket (e.g. H9429R x2 TKTS.pdf) to auto-fill
+                        departure/return flights, via times, luggage, and units.
+                      </p>
+                    </div>
+                    <Label
+                      htmlFor="ticket-pdf-upload"
+                      className={`inline-flex items-center justify-center rounded-md border border-border bg-background px-3 py-2 text-sm font-medium cursor-pointer hover:bg-muted ${
+                        parsingTicket ? "opacity-60 pointer-events-none" : ""
+                      }`}
+                    >
+                      {parsingTicket ? "Reading PDF…" : "Choose PDF"}
+                    </Label>
+                    <Input
+                      id="ticket-pdf-upload"
+                      type="file"
+                      accept="application/pdf,.pdf"
+                      className="hidden"
+                      disabled={parsingTicket}
+                      onChange={(e) => {
+                        const file = e.target.files?.[0] || null;
+                        void parseTicketPdf(file);
+                        e.currentTarget.value = "";
+                      }}
+                    />
+                  </div>
+                </div>
+
                 <FlightSegmentEditor
                   title="Departure flight"
                   hint="Outbound flight going to Saudi Arabia."

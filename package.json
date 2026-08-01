@@ -7,6 +7,7 @@
     "build": "next build && npm run copy:standalone",
     "copy:standalone": "node scripts/copy-standalone-assets.mjs",
     "minio:ensure": "node scripts/ensure-minio-bucket.mjs",
+    "ticket:parse": "tsx scripts/parse-ticket-cli.ts",
     "start": "npm run minio:ensure && node --env-file=.env .next/standalone/server.js",
     "start:next": "npm run minio:ensure && next start",
     "lint": "eslint"
@@ -18,6 +19,7 @@
     "framer-motion": "^12.40.0",
     "lucide-react": "^1.18.0",
     "next": "16.2.9",
+    "pdf-parse": "^2.4.5",
     "radix-ui": "^1.6.0",
     "react": "19.2.4",
     "react-dom": "19.2.4",
@@ -34,6 +36,7 @@
     "eslint": "^9",
     "eslint-config-next": "16.2.9",
     "tailwindcss": "^4",
+    "tsx": "^4.23.1",
     "typescript": "^5"
   }
 }
