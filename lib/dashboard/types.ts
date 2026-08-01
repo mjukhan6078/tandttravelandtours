@@ -35,7 +35,11 @@ export interface TripTicket {
   luggageAllowance: string;
   mealIncluded: boolean;
   flightType: FlightType;
-  /** Layover / connecting city stay details when flight is connecting */
+  /** Connecting airport IATA code when flight is connecting */
+  connectingAirport: string;
+  /** Layover duration, e.g. "4h 30m" */
+  connectingDuration: string;
+  /** Summary kept for compatibility / display: via {airport} · {duration} */
   connectingStay: string;
   notes: string;
 }
@@ -182,6 +186,8 @@ export function defaultTicket(): TripTicket {
     luggageAllowance: "",
     mealIncluded: false,
     flightType: "direct",
+    connectingAirport: "",
+    connectingDuration: "",
     connectingStay: "",
     notes: "",
   };

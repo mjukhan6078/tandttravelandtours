@@ -13,6 +13,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import AnimatedSection from "./AnimatedSection";
+import { PLAN_AIRLINE_OPTIONS, airlineLabel } from "@/lib/airlines";
 import {
   CalendarRange,
   MapPin,
@@ -38,21 +39,6 @@ const DISTANCE_OPTIONS = [
   { value: "2000", label: "1–2km" },
 ] as const;
 
-const AIRLINE_OPTIONS = [
-  { value: "any", label: "Any airline" },
-  { value: "saudia", label: "Saudia" },
-  { value: "flynas", label: "flynas" },
-  { value: "flyadeal", label: "flyadeal" },
-  { value: "emirates", label: "Emirates" },
-  { value: "etihad", label: "Etihad" },
-  { value: "qatar", label: "Qatar Airways" },
-  { value: "pia", label: "PIA" },
-  { value: "airblue", label: "Airblue" },
-  { value: "serene", label: "Serene Air" },
-  { value: "turkish", label: "Turkish Airlines" },
-  { value: "other", label: "Other / specify in chat" },
-] as const;
-
 const FLIGHT_TYPE_OPTIONS = [
   { value: "direct", label: "Direct flight preferred" },
   { value: "connecting", label: "Connecting is fine" },
@@ -71,10 +57,6 @@ function formatDate(value: string) {
 
 function distanceLabel(value: string) {
   return DISTANCE_OPTIONS.find((option) => option.value === value)?.label ?? value;
-}
-
-function airlineLabel(value: string) {
-  return AIRLINE_OPTIONS.find((option) => option.value === value)?.label ?? value;
 }
 
 function flightTypeLabel(value: string) {
@@ -379,7 +361,7 @@ Please share available options and a quote.`;
                           <SelectValue placeholder="Select airline" />
                         </SelectTrigger>
                         <SelectContent>
-                          {AIRLINE_OPTIONS.map((option) => (
+                          {PLAN_AIRLINE_OPTIONS.map((option) => (
                             <SelectItem key={option.value} value={option.value}>
                               {option.label}
                             </SelectItem>

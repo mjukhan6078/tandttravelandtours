@@ -11,6 +11,7 @@ import type {
   VisaStatus,
 } from "./types";
 import { defaultPayment, defaultTicket, defaultVisa } from "./types";
+import { formatConnectingStay } from "./connecting";
 
 function newHotelId() {
   return `hotel_${randomBytes(4).toString("hex")}`;
@@ -29,18 +30,30 @@ export function sanitizeTicket(input: unknown): TripTicket {
   if (!input || typeof input !== "object") return base;
   const row = input as Partial<TripTicket>;
   const flightType: FlightType = row.flightType === "connecting" ? "connecting" : "direct";
+  const connectingAirport =
+    flightType === "connecting" ? asString(row.connectingAirport).toUpperCase() : "";
+  const connectingDuration =
+    flightType === "connecting" ? asString(row.connectingDuration) : "";
+  const connectingStay =
+    flightType === "connecting"
+      ? formatConnectingStay(connectingAirport, connectingDuration) ||
+        asString(row.connectingStay)
+      : "";
+
   return {
     airline: asString(row.airline),
     flightNumber: asString(row.flightNumber),
-    departureAirport: asString(row.departureAirport),
-    arrivalAirport: asString(row.arrivalAirport),
+    departureAirport: asString(row.departureAirport).toUpperCase(),
+    arrivalAirport: asString(row.arrivalAirport).toUpperCase(),
     takeoffAt: asString(row.takeoffAt),
     ticketPrice: asString(row.ticketPrice),
     currency: asString(row.currency) || "PKR",
     luggageAllowance: asString(row.luggageAllowance),
     mealIncluded: asBool(row.mealIncluded),
     flightType,
-    connectingStay: flightType === "connecting" ? asString(row.connectingStay) : "",
+    connectingAirport,
+    connectingDuration,
+    connectingStay,
     notes: asString(row.notes),
   };
 }

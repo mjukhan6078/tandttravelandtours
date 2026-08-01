@@ -175,87 +175,103 @@ export default function ItineraryEditor({
         </div>
       )}
 
-      <div className="space-y-3">
-        {stays.map((stay, index) => {
-          const range = schedule.find((item) => item.id === stay.id);
-          return (
-            <div
-              key={stay.id}
-              className="grid gap-3 sm:grid-cols-[auto_1fr_120px_auto] items-end rounded-md border border-border bg-background p-3"
-            >
-              <div className="text-sm font-semibold text-primary pt-2 sm:pt-0">
-                {index + 1}.
-              </div>
-              <div className="space-y-2">
-                <Label>City</Label>
-                <Select
-                  value={stay.city}
-                  onValueChange={(city) => updateStay(stay.id, { city: city as StayCity })}
-                >
-                  <SelectTrigger className="w-full">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="makkah">{STAY_CITY_LABELS.makkah}</SelectItem>
-                    <SelectItem value="madina">{STAY_CITY_LABELS.madina}</SelectItem>
-                  </SelectContent>
-                </Select>
-                {range && (
-                  <p className="text-[11px] text-muted-foreground">
-                    {range.from} → {range.to}
+      <div className="rounded-md border border-border bg-background overflow-hidden">
+        <div className="hidden sm:grid sm:grid-cols-[40px_minmax(140px,1fr)_minmax(180px,1.2fr)_88px_120px] gap-3 px-3 py-2 border-b border-border bg-muted/40 text-xs font-medium text-muted-foreground">
+          <span>#</span>
+          <span>City</span>
+          <span>Dates</span>
+          <span>Nights</span>
+          <span className="text-right">Actions</span>
+        </div>
+
+        <div className="divide-y divide-border">
+          {stays.map((stay, index) => {
+            const range = schedule.find((item) => item.id === stay.id);
+            return (
+              <div
+                key={stay.id}
+                className="grid grid-cols-1 sm:grid-cols-[40px_minmax(140px,1fr)_minmax(180px,1.2fr)_88px_120px] gap-3 px-3 py-3 items-center"
+              >
+                <div className="text-sm font-semibold text-primary">{index + 1}.</div>
+
+                <div className="min-w-0">
+                  <Label className="sm:hidden mb-1.5 block">City</Label>
+                  <Select
+                    value={stay.city}
+                    onValueChange={(city) => updateStay(stay.id, { city: city as StayCity })}
+                  >
+                    <SelectTrigger className="w-full h-9">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="makkah">{STAY_CITY_LABELS.makkah}</SelectItem>
+                      <SelectItem value="madina">{STAY_CITY_LABELS.madina}</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="min-w-0">
+                  <Label className="sm:hidden mb-1.5 block">Dates</Label>
+                  <p className="text-sm text-muted-foreground truncate leading-9">
+                    {range ? `${range.from} → ${range.to}` : "Set start date"}
                   </p>
-                )}
+                </div>
+
+                <div>
+                  <Label className="sm:hidden mb-1.5 block">Nights</Label>
+                  <Input
+                    type="number"
+                    min={1}
+                    max={60}
+                    className="h-9"
+                    value={stay.nights}
+                    onChange={(e) =>
+                      updateStay(stay.id, {
+                        nights: Math.max(1, Math.min(60, Number(e.target.value) || 1)),
+                      })
+                    }
+                  />
+                </div>
+
+                <div className="flex items-center justify-start sm:justify-end gap-0.5">
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className="h-9 w-9"
+                    onClick={() => moveStay(index, -1)}
+                    disabled={index === 0}
+                    aria-label="Move up"
+                  >
+                    <ArrowUp className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className="h-9 w-9"
+                    onClick={() => moveStay(index, 1)}
+                    disabled={index === stays.length - 1}
+                    aria-label="Move down"
+                  >
+                    <ArrowDown className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className="h-9 w-9 text-destructive"
+                    onClick={() => removeStay(stay.id)}
+                    disabled={stays.length <= 1}
+                    aria-label="Remove stay"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </div>
               </div>
-              <div className="space-y-2">
-                <Label>Nights</Label>
-                <Input
-                  type="number"
-                  min={1}
-                  max={60}
-                  value={stay.nights}
-                  onChange={(e) =>
-                    updateStay(stay.id, {
-                      nights: Math.max(1, Math.min(60, Number(e.target.value) || 1)),
-                    })
-                  }
-                />
-              </div>
-              <div className="flex items-center gap-1">
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon"
-                  onClick={() => moveStay(index, -1)}
-                  disabled={index === 0}
-                  aria-label="Move up"
-                >
-                  <ArrowUp className="h-4 w-4" />
-                </Button>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon"
-                  onClick={() => moveStay(index, 1)}
-                  disabled={index === stays.length - 1}
-                  aria-label="Move down"
-                >
-                  <ArrowDown className="h-4 w-4" />
-                </Button>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon"
-                  className="text-destructive"
-                  onClick={() => removeStay(stay.id)}
-                  disabled={stays.length <= 1}
-                  aria-label="Remove stay"
-                >
-                  <Trash2 className="h-4 w-4" />
-                </Button>
-              </div>
-            </div>
-          );
-        })}
+            );
+          })}
+        </div>
       </div>
 
       <div className="flex flex-wrap gap-3 text-xs text-muted-foreground">
