@@ -30,6 +30,7 @@ import {
 } from "@/lib/dashboard/duration";
 import {
   formatMoneyAmount,
+  segmentCurrencyLabel,
   segmentHasFlightDetails,
   segmentLineTotal,
   syncSegmentTicketPrice,
@@ -37,6 +38,7 @@ import {
 } from "@/lib/dashboard/ticket-pricing";
 import {
   PAYMENT_STATUS_LABELS,
+  TICKET_CURRENCY_OPTIONS,
   TRIP_STATUS_LABELS,
   VISA_STATUS_LABELS,
   defaultFlightSegment,
@@ -46,6 +48,7 @@ import {
   type DocumentType,
   type FlightSegment,
   type PaymentStatus,
+  type TicketCurrency,
   type TripHotel,
   type TripPayment,
   type TripStatus,
@@ -550,12 +553,42 @@ export default function TripDetailPage() {
                         </div>
                         <div className="space-y-2">
                           <Label>Unit price</Label>
-                          <Input
-                            disabled={!ready}
-                            value={segment.unitPrice}
-                            onChange={(e) => updateSegment({ unitPrice: e.target.value })}
-                            placeholder="Price per ticket"
-                          />
+                          <div className="flex">
+                            <Input
+                              disabled={!ready}
+                              value={segment.unitPrice}
+                              onChange={(e) => updateSegment({ unitPrice: e.target.value })}
+                              placeholder="Price per ticket"
+                              className="rounded-r-none"
+                            />
+                            <Select
+                              disabled={!ready}
+                              value={segment.currency || "PKR"}
+                              onValueChange={(currency) =>
+                                updateSegment({ currency: currency as TicketCurrency })
+                              }
+                            >
+                              <SelectTrigger className="w-[96px] rounded-l-none border-l-0">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {TICKET_CURRENCY_OPTIONS.map((option) => (
+                                  <SelectItem key={option.value} value={option.value}>
+                                    {option.label}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          {segment.currency === "OTHER" && (
+                            <Input
+                              disabled={!ready}
+                              value={segment.currencyOther || ""}
+                              onChange={(e) => updateSegment({ currencyOther: e.target.value })}
+                              placeholder="Currency name / code"
+                              className="mt-2"
+                            />
+                          )}
                         </div>
                         <div className="space-y-2">
                           <Label>Units</Label>
@@ -584,32 +617,48 @@ export default function TripDetailPage() {
                         </div>
                         <div className="space-y-2">
                           <Label>Line total</Label>
-                          <Input
-                            readOnly
-                            disabled={!ready}
-                            value={formatMoneyAmount(segmentLineTotal(segment))}
-                            placeholder="Auto"
-                          />
+                          <div className="relative">
+                            <Input
+                              readOnly
+                              disabled={!ready}
+                              value={formatMoneyAmount(segmentLineTotal(segment))}
+                              placeholder="Auto"
+                              className="pr-16"
+                            />
+                            <span className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-xs text-muted-foreground">
+                              {segmentCurrencyLabel(segment)}
+                            </span>
+                          </div>
                         </div>
                       </div>
                     );
                   })}
 
                   <div className="grid sm:grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label>Currency</Label>
-                      <Input
-                        value={ticket.currency}
-                        onChange={(e) => setTicket({ ...ticket, currency: e.target.value })}
-                      />
-                    </div>
-                    <div className="space-y-2">
+                    <div className="space-y-2 sm:col-span-2">
                       <Label>Grand total</Label>
-                      <Input
-                        readOnly
-                        value={formatMoneyAmount(ticketGrandTotal(ticket))}
-                        placeholder="Auto from all tickets"
-                      />
+                      <div className="relative">
+                        <Input
+                          readOnly
+                          value={(() => {
+                            const depLabel = segmentCurrencyLabel(ticket.departure);
+                            const arrLabel = segmentCurrencyLabel(ticket.arrival);
+                            const depTotal = segmentLineTotal(ticket.departure);
+                            const arrTotal = segmentLineTotal(ticket.arrival);
+                            if (!depTotal && !arrTotal) return "";
+                            if (depLabel === arrLabel) {
+                              return `${formatMoneyAmount(ticketGrandTotal(ticket))} ${depLabel}`;
+                            }
+                            return [
+                              depTotal ? `${formatMoneyAmount(depTotal)} ${depLabel}` : "",
+                              arrTotal ? `${formatMoneyAmount(arrTotal)} ${arrLabel}` : "",
+                            ]
+                              .filter(Boolean)
+                              .join(" + ");
+                          })()}
+                          placeholder="Auto from all tickets"
+                        />
+                      </div>
                     </div>
                     <div className="space-y-2 sm:col-span-2">
                       <Label>Ticket notes</Label>

@@ -47,6 +47,10 @@ export interface FlightSegment {
   connectingStay: string;
   /** Price per single ticket for this flight */
   unitPrice: string;
+  /** Currency for this flight price: PKR, SAR (Riyal), or OTHER */
+  currency: TicketCurrency;
+  /** Custom currency label when currency is OTHER */
+  currencyOther: string;
   /** Number of tickets for this same flight */
   ticketUnits: number;
   /** Auto total for this flight: unitPrice × ticketUnits */
@@ -55,14 +59,23 @@ export interface FlightSegment {
   mealIncluded: boolean;
 }
 
+export type TicketCurrency = "PKR" | "SAR" | "OTHER";
+
 export interface TripTicket {
   /** Outbound / going flight */
   departure: FlightSegment;
   /** Return / coming-back flight (can differ from departure) */
   arrival: FlightSegment;
+  /** Legacy / fallback currency */
   currency: string;
   notes: string;
 }
+
+export const TICKET_CURRENCY_OPTIONS: { value: TicketCurrency; label: string }[] = [
+  { value: "PKR", label: "PKR" },
+  { value: "SAR", label: "Riyal" },
+  { value: "OTHER", label: "Other" },
+];
 
 export interface TripVisa {
   status: VisaStatus;
@@ -209,6 +222,8 @@ export function defaultFlightSegment(): FlightSegment {
     connectingDepartureTime: "",
     connectingStay: "",
     unitPrice: "",
+    currency: "PKR",
+    currencyOther: "",
     ticketUnits: 1,
     ticketPrice: "",
     luggageAllowance: "",

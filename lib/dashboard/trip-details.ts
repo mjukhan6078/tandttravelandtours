@@ -13,7 +13,7 @@ import type {
 } from "./types";
 import { defaultFlightSegment, defaultPayment, defaultTicket, defaultVisa } from "./types";
 import { formatConnectingStay } from "./connecting";
-import { syncSegmentTicketPrice } from "./ticket-pricing";
+import { normalizeTicketCurrency, syncSegmentTicketPrice } from "./ticket-pricing";
 
 function newHotelId() {
   return `hotel_${randomBytes(4).toString("hex")}`;
@@ -58,6 +58,14 @@ export function sanitizeFlightSegment(input: unknown): FlightSegment {
     : unitPrice
       ? 1
       : 0;
+  const currency = normalizeTicketCurrency(row.currency);
+  const currencyOther =
+    currency === "OTHER"
+      ? asString(row.currencyOther) ||
+        (asString(row.currency) && !["PKR", "SAR", "OTHER", "RIYAL", "SR", "RS"].includes(asString(row.currency).toUpperCase())
+          ? asString(row.currency)
+          : "")
+      : "";
 
   return syncSegmentTicketPrice({
     airline: asString(row.airline),
@@ -73,6 +81,8 @@ export function sanitizeFlightSegment(input: unknown): FlightSegment {
     connectingDepartureTime,
     connectingStay,
     unitPrice,
+    currency,
+    currencyOther,
     ticketUnits,
     ticketPrice: asString(row.ticketPrice),
     luggageAllowance: asString(row.luggageAllowance),
@@ -145,10 +155,31 @@ export function sanitizeTicket(input: unknown): TripTicket {
     }
   }
 
+  // Migrate old ticket-level currency onto segments
+  const legacyCurrency = asString(row.currency);
+  if (legacyCurrency) {
+    const normalized = normalizeTicketCurrency(legacyCurrency);
+    if (!row.departure || !(row.departure as { currency?: string }).currency) {
+      departure = syncSegmentTicketPrice({
+        ...departure,
+        currency: normalized,
+        currencyOther:
+          normalized === "OTHER" ? legacyCurrency : departure.currencyOther,
+      });
+    }
+    if (!row.arrival || !(row.arrival as { currency?: string }).currency) {
+      arrival = syncSegmentTicketPrice({
+        ...arrival,
+        currency: normalized,
+        currencyOther: normalized === "OTHER" ? legacyCurrency : arrival.currencyOther,
+      });
+    }
+  }
+
   return {
     departure,
     arrival,
-    currency: asString(row.currency) || "PKR",
+    currency: departure.currency === "OTHER" ? departure.currencyOther || "OTHER" : departure.currency,
     notes: asString(row.notes),
   };
 }
