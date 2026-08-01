@@ -14,7 +14,7 @@ export default function About() {
           <div className="grid md:grid-cols-3 gap-8">
             {[
               {
-                title: "15+ Years Experience",
+                title: "10+ Years Experience",
                 desc: "Decades of expertise in organizing spiritual pilgrimages",
               },
               {

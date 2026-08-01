@@ -5,6 +5,10 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
+const WHATSAPP_NUMBER = "923002062324";
+const WHATSAPP_DISPLAY = "+92 300 2062324";
+const WHATSAPP_URL = `https://wa.me/${WHATSAPP_NUMBER}`;
+
 export default function Contact() {
   return (
     <section id="contact" className="py-20">
@@ -22,17 +26,23 @@ export default function Contact() {
             <div className="space-y-6">
               <Card>
                 <CardHeader>
-                  <CardTitle>📱 WhatsApp</CardTitle>
+                  <CardTitle>WhatsApp</CardTitle>
                 </CardHeader>
-                <CardContent>
-                  <p className="text-muted-foreground mb-4">Message us directly on WhatsApp</p>
-                  <Button className="w-full bg-green-600 hover:bg-green-700">
-                    <a
-                      href="https://wa.me/923002062324"
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="flex items-center justify-center"
-                    >
+                <CardContent className="space-y-2">
+                  <p className="text-muted-foreground">Message us directly on WhatsApp</p>
+                  <a
+                    href={WHATSAPP_URL}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="block text-xl font-semibold text-primary hover:text-primary/80 transition-colors"
+                  >
+                    {WHATSAPP_DISPLAY}
+                  </a>
+                  <Button
+                    asChild
+                    className="w-full bg-[#25D366] hover:bg-[#1ebe57] text-white"
+                  >
+                    <a href={WHATSAPP_URL} target="_blank" rel="noopener noreferrer">
                       Chat on WhatsApp
                     </a>
                   </Button>
@@ -43,7 +53,7 @@ export default function Contact() {
                   <CardTitle>📧 Email</CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <p className="text-muted-foreground">info@tandttravel.com</p>
+                  <p className="text-muted-foreground">info@tandttravelandtours.com</p>
                 </CardContent>
               </Card>
               <Card>
@@ -51,7 +61,7 @@ export default function Contact() {
                   <CardTitle>📍 Address</CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <p className="text-muted-foreground">123 Travel Street, Makkah, Saudi Arabia</p>
+                  <p className="text-muted-foreground">Office# 18, Sohni Shopping Mall, 2nd Floor, Main Karimabad, Karachi, Pakistan</p>
                 </CardContent>
               </Card>
             </div>

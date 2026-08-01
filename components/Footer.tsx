@@ -1,57 +1,78 @@
 import Image from "next/image";
 import Link from "next/link";
 
+const WHATSAPP_URL = "https://wa.me/923002062324";
+const WHATSAPP_DISPLAY = "+92 300 2062324";
+
 export default function Footer() {
   return (
-    <footer className="bg-primary text-primary-foreground py-16">
-      <div className="container mx-auto px-4">
-        <div className="grid md:grid-cols-4 gap-12">
+    <footer className="bg-primary text-primary-foreground">
+      <div className="container mx-auto px-4 py-12 md:py-14">
+        <div className="grid gap-10 md:grid-cols-[1.4fr_1fr_1fr]">
           <div>
-            <div className="flex items-center space-x-2 mb-6">
+            <Link href="#home" className="inline-flex items-center gap-3 mb-4">
               <Image
-                  src="/images/logo.png"
-                  alt="T&T Travel and Tours"
-                  width={50}
-                  height={50}
-                  className="object-contain brightness-0 invert h-auto"
-                />
-              <span className="text-2xl font-bold">T&T Travel</span>
-            </div>
-            <p className="text-primary-foreground/80">
-              Your trusted partner for spiritual journeys and travel adventures.
+                src="/images/logo.png"
+                alt="T&T Travel and Tours"
+                width={44}
+                height={44}
+                className="object-contain brightness-0 invert h-11 w-11"
+              />
+              <span className="text-xl font-heading font-semibold">
+                T&T Travel and Tours
+              </span>
+            </Link>
+            <p className="text-sm text-primary-foreground/70 max-w-sm leading-relaxed">
+              Trusted Umrah planning — flights, hotels, visa, ziaraat, and transport.
             </p>
           </div>
 
           <div>
-            <h4 className="text-lg font-bold mb-6">Get Started</h4>
-            <ul className="space-y-3">
-              <li><Link href="#plan-your-trip" className="text-primary-foreground/80 hover:text-white">Plan Your Trip</Link></li>
-              <li><Link href="#contact" className="text-primary-foreground/80 hover:text-white">Contact</Link></li>
+            <h4 className="text-sm font-semibold tracking-wide uppercase text-secondary mb-4">
+              Explore
+            </h4>
+            <ul className="space-y-2.5 text-sm">
+              <li>
+                <Link href="#services" className="text-primary-foreground/75 hover:text-primary-foreground transition-colors">
+                  Services
+                </Link>
+              </li>
+              <li>
+                <Link href="#plan-your-trip" className="text-primary-foreground/75 hover:text-primary-foreground transition-colors">
+                  Plan Your Trip
+                </Link>
+              </li>
+              <li>
+                <Link href="#contact" className="text-primary-foreground/75 hover:text-primary-foreground transition-colors">
+                  Contact
+                </Link>
+              </li>
             </ul>
           </div>
 
           <div>
-            <h4 className="text-lg font-bold mb-6">Services</h4>
-            <ul className="space-y-3">
-              <li><span className="text-primary-foreground/80">Umrah Packages</span></li>
-              <li><span className="text-primary-foreground/80">Hajj Packages</span></li>
-              <li><span className="text-primary-foreground/80">Tours & Travel</span></li>
-              <li><span className="text-primary-foreground/80">Visa Assistance</span></li>
-            </ul>
-          </div>
-
-          <div>
-            <h4 className="text-lg font-bold mb-6">Contact Info</h4>
-            <ul className="space-y-3 text-primary-foreground/80">
-              <li>+1 (234) 567-890</li>
-              <li>info@tandttravel.com</li>
-              <li>123 Travel Street, City</li>
-            </ul>
+            <h4 className="text-sm font-semibold tracking-wide uppercase text-secondary mb-4">
+              WhatsApp
+            </h4>
+            <a
+              href={WHATSAPP_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-lg font-semibold text-primary-foreground hover:text-secondary transition-colors"
+            >
+              {WHATSAPP_DISPLAY}
+            </a>
+            <p className="mt-2 text-sm text-primary-foreground/65">
+              Tap to chat for trip queries
+            </p>
           </div>
         </div>
+      </div>
 
-        <div className="border-t border-primary-foreground/20 mt-12 pt-8 text-center text-primary-foreground/60">
-          <p>&copy; 2026 T&T Travel and Tours. All rights reserved.</p>
+      <div className="border-t border-primary-foreground/15">
+        <div className="container mx-auto px-4 py-5 flex flex-col sm:flex-row items-center justify-between gap-2 text-xs text-primary-foreground/55">
+          <p>&copy; {new Date().getFullYear()} T&T Travel and Tours</p>
+          <p>Umrah · Hotels · Visa · Ziaraat · Transport</p>
         </div>
       </div>
     </footer>
