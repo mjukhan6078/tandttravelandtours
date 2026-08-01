@@ -59,7 +59,10 @@ export interface FlightSegment {
   connectingDuration: string;
   /** Departure time from connecting airport HH:mm (auto from arrival + duration) */
   connectingDepartureTime: string;
-  connectingTerminal: string;
+  /** Terminal when arriving at the via airport */
+  connectingArrivalTerminal: string;
+  /** Terminal when departing the via airport (can differ) */
+  connectingDepartureTerminal: string;
   /** Summary: via {airport} · {duration} */
   connectingStay: string;
   bookingClass: string;
@@ -269,7 +272,8 @@ export function defaultFlightSegment(): FlightSegment {
     connectingArrivalTime: "",
     connectingDuration: "",
     connectingDepartureTime: "",
-    connectingTerminal: "",
+    connectingArrivalTerminal: "",
+    connectingDepartureTerminal: "",
     connectingStay: "",
     bookingClass: "",
     status: "",

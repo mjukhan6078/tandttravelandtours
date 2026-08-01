@@ -110,12 +110,15 @@ function parsePassportExpiry(raw: string): string {
 }
 
 function cleanTerminal(raw: string): string {
-  return raw
+  const cleaned = raw
     .replace(/International/gi, "")
     .replace(/Terminal/gi, "")
     .replace(/[-–]/g, " ")
     .replace(/\s+/g, " ")
     .trim();
+  // Prefer short codes like "M", "1", "2" when present
+  const code = cleaned.match(/^([A-Z0-9]+)\b/i)?.[1];
+  return code || cleaned;
 }
 
 function parsePassengers(text: string): ParsedTicketPassenger[] {
@@ -148,8 +151,14 @@ function parsePassengers(text: string): ParsedTicketPassenger[] {
 
 function parseLegs(text: string): ParsedTicketFlightLeg[] {
   const legs: ParsedTicketFlightLeg[] = [];
-  const legRegex =
-    /(\d+)\s*-\s*([A-Z0-9]{2})\s*-\s*([^-]+?)\s*-\s*Flight\s*No:\s*(\d+)[\s\S]*?Date:\s*([A-Za-z]{3},\s*[A-Za-z]{3}\s*\d{1,2},\s*\d{4})[\s\S]*?Baggage:\s*([^\n]+)[\s\S]*?Depart:\s*([A-Z]{3})\s*-\s*(.*?)\s+at\s+(\d{3,4})(?:\s+from\s+Terminal\s+([^-\n]*?))?[\s\S]*?Arrives:\s*([A-Z]{3})\s*-\s*(.*?)\s+at\s+(\d{3,4})(?:\s+from\s+Terminal\s+([^-\n]*?))?[\s\S]*?(?:Class:\s*([^\n]*?))?\s*Status:\s*([^\n]+)/gi;
+  // Galileo layout: "at 1640 from Terminal M - International"
+  // Terminal code is optional (e.g. "Terminal - International" = none).
+  const terminalPart =
+    "(?:\\s+from\\s+Terminal(?:\\s+([A-Za-z0-9]+))?(?:\\s*-\\s*[^\\n]*)?)?";
+  const legRegex = new RegExp(
+    `(\\d+)\\s*-\\s*([A-Z0-9]{2})\\s*-\\s*([^-]+?)\\s*-\\s*Flight\\s*No:\\s*(\\d+)[\\s\\S]*?Date:\\s*([A-Za-z]{3},\\s*[A-Za-z]{3}\\s*\\d{1,2},\\s*\\d{4})[\\s\\S]*?Baggage:\\s*([^\\n]+)[\\s\\S]*?Depart:\\s*([A-Z]{3})\\s*-\\s*(.*?)\\s+at\\s+(\\d{3,4})${terminalPart}[\\s\\S]*?Arrives:\\s*([A-Z]{3})\\s*-\\s*(.*?)\\s+at\\s+(\\d{3,4})${terminalPart}[\\s\\S]*?(?:Class:\\s*([^\\n]*?))?\\s*Status:\\s*([^\\n]+)`,
+    "gi"
+  );
 
   let match: RegExpExecArray | null;
   while ((match = legRegex.exec(text))) {
@@ -261,7 +270,8 @@ function buildSegmentFromLegs(legs: ParsedTicketFlightLeg[]): FlightSegment {
     connectingArrivalTime,
     connectingDepartureTime,
     connectingDuration,
-    connectingTerminal: first.arriveTerminal || legs[1].departTerminal || "",
+    connectingArrivalTerminal: first.arriveTerminal || "",
+    connectingDepartureTerminal: legs[1].departTerminal || "",
     connectingStay: formatConnectingStay(via, connectingDuration),
     bookingClass,
     status,

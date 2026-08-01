@@ -53,6 +53,17 @@ export function sanitizeFlightSegment(input: unknown): FlightSegment {
     flightType === "connecting" ? asString(row.connectingDuration) : "";
   const connectingDepartureTime =
     flightType === "connecting" ? asString(row.connectingDepartureTime) : "";
+  const legacyViaTerminal = asString(
+    (row as { connectingTerminal?: string }).connectingTerminal
+  );
+  const connectingArrivalTerminal =
+    flightType === "connecting"
+      ? asString(row.connectingArrivalTerminal) || legacyViaTerminal
+      : "";
+  const connectingDepartureTerminal =
+    flightType === "connecting"
+      ? asString(row.connectingDepartureTerminal) || legacyViaTerminal
+      : "";
   const connectingStay =
     flightType === "connecting"
       ? formatConnectingStay(connectingAirport, connectingDuration) ||
@@ -97,7 +108,8 @@ export function sanitizeFlightSegment(input: unknown): FlightSegment {
     connectingArrivalTime,
     connectingDuration,
     connectingDepartureTime,
-    connectingTerminal: flightType === "connecting" ? asString(row.connectingTerminal) : "",
+    connectingArrivalTerminal,
+    connectingDepartureTerminal,
     connectingStay,
     bookingClass: asString(row.bookingClass),
     status: asString(row.status),

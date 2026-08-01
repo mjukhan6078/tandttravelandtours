@@ -67,7 +67,8 @@ export default function FlightSegmentEditor({
       next.connectingArrivalTime = "";
       next.connectingDuration = "";
       next.connectingDepartureTime = "";
-      next.connectingTerminal = "";
+      next.connectingArrivalTerminal = "";
+      next.connectingDepartureTerminal = "";
       next.connectingStay = "";
     }
     onChange(next);
@@ -216,13 +217,21 @@ export default function FlightSegmentEditor({
                 onChange={(connectingAirport) => patch({ connectingAirport })}
                 placeholder="Connecting airport"
               />
-              <div className="grid grid-cols-[1fr_auto_1fr] gap-2 items-center">
-                <Input
-                  type="time"
-                  value={value.connectingArrivalTime || ""}
-                  onChange={(e) => updateViaArrival(e.target.value)}
-                  aria-label="Arrival time at connecting airport"
-                />
+              <div className="grid grid-cols-[1fr_auto_1fr] gap-2 items-start">
+                <div className="space-y-2 min-w-0">
+                  <Input
+                    type="time"
+                    value={value.connectingArrivalTime || ""}
+                    onChange={(e) => updateViaArrival(e.target.value)}
+                    aria-label="Arrival time at connecting airport"
+                  />
+                  <Input
+                    value={value.connectingArrivalTerminal || ""}
+                    onChange={(e) => patch({ connectingArrivalTerminal: e.target.value })}
+                    placeholder="Arrive terminal"
+                    aria-label="Arrival terminal at connecting airport"
+                  />
+                </div>
                 <Select
                   value={
                     parseConnectingDuration(value.connectingDuration).hours > 0
@@ -231,7 +240,7 @@ export default function FlightSegmentEditor({
                   }
                   onValueChange={(v) => updateViaDuration(Number(v))}
                 >
-                  <SelectTrigger className="w-[88px]" aria-label="Connecting stay duration hours">
+                  <SelectTrigger className="w-[88px] mt-0" aria-label="Connecting stay duration hours">
                     <SelectValue placeholder="Hours" />
                   </SelectTrigger>
                   <SelectContent>
@@ -242,18 +251,21 @@ export default function FlightSegmentEditor({
                     ))}
                   </SelectContent>
                 </Select>
-                <Input
-                  type="time"
-                  value={value.connectingDepartureTime || ""}
-                  onChange={(e) => updateViaDeparture(e.target.value)}
-                  aria-label="Departure time from connecting airport"
-                />
+                <div className="space-y-2 min-w-0">
+                  <Input
+                    type="time"
+                    value={value.connectingDepartureTime || ""}
+                    onChange={(e) => updateViaDeparture(e.target.value)}
+                    aria-label="Departure time from connecting airport"
+                  />
+                  <Input
+                    value={value.connectingDepartureTerminal || ""}
+                    onChange={(e) => patch({ connectingDepartureTerminal: e.target.value })}
+                    placeholder="Depart terminal"
+                    aria-label="Departure terminal from connecting airport"
+                  />
+                </div>
               </div>
-              <Input
-                value={value.connectingTerminal || ""}
-                onChange={(e) => patch({ connectingTerminal: e.target.value })}
-                placeholder="Via terminal"
-              />
             </div>
           )}
 
