@@ -8,6 +8,6 @@ services:
       - "3090:3000"
     environment:
       NODE_ENV: production
-      PORT: 3090
-      HOSTNAME: 192.168.100.184
+      PORT: 3000
+      HOSTNAME: 0.0.0.0
     restart: unless-stopped
