@@ -1,4 +1,38 @@
-import type { FlightSegment, TicketCurrency, TripTicket } from "./types";
+import {
+  TICKET_CURRENCY_OPTIONS,
+  type FlightSegment,
+  type TicketCurrency,
+  type TripTicket,
+} from "./types";
+
+const CURRENCY_ALIASES: Record<string, TicketCurrency> = {
+  PKR: "PKR",
+  RS: "PKR",
+  SAR: "SAR",
+  RIYAL: "SAR",
+  SR: "SAR",
+  AED: "AED",
+  DIRHAM: "AED",
+  QAR: "QAR",
+  BHD: "BHD",
+  KWD: "KWD",
+  OMR: "OMR",
+  USD: "USD",
+  DOLLAR: "USD",
+  EUR: "EUR",
+  EURO: "EUR",
+  GBP: "GBP",
+  POUND: "GBP",
+  TRY: "TRY",
+  TL: "TRY",
+  INR: "INR",
+  BDT: "BDT",
+  MYR: "MYR",
+  SGD: "SGD",
+  CAD: "CAD",
+  AUD: "AUD",
+  OTHER: "OTHER",
+};
 
 export function segmentHasFlightDetails(segment: FlightSegment | undefined | null): boolean {
   if (!segment) return false;
@@ -24,30 +58,27 @@ export function formatMoneyAmount(amount: number): string {
 
 export function segmentCurrencyLabel(segment: FlightSegment | undefined | null): string {
   if (!segment) return "PKR";
-  if (segment.currency === "SAR") return "Riyal";
   if (segment.currency === "OTHER") {
     return segment.currencyOther?.trim() || "Other";
   }
-  return "PKR";
+  const option = TICKET_CURRENCY_OPTIONS.find((item) => item.value === segment.currency);
+  return option?.value || "PKR";
 }
 
-export function normalizeTicketCurrency(value: unknown, fallback: TicketCurrency = "PKR"): TicketCurrency {
-  if (value === "SAR" || value === "OTHER" || value === "PKR") return value;
+export function normalizeTicketCurrency(
+  value: unknown,
+  fallback: TicketCurrency = "PKR"
+): TicketCurrency {
   const text = String(value || "").trim().toUpperCase();
-  if (text === "SAR" || text === "RIYAL" || text === "SR") return "SAR";
-  if (text === "OTHER") return "OTHER";
-  if (text === "PKR" || text === "RS") return "PKR";
-  if (text) return "OTHER";
-  return fallback;
+  if (!text) return fallback;
+  if ((TICKET_CURRENCY_OPTIONS as readonly { value: string }[]).some((item) => item.value === text)) {
+    return text as TicketCurrency;
+  }
+  return CURRENCY_ALIASES[text] || "OTHER";
 }
 
 export function ticketGrandTotal(ticket: TripTicket): number {
-  const dep = segmentLineTotal(ticket.departure);
-  const arr = segmentLineTotal(ticket.arrival);
-  const sameCurrency =
-    segmentCurrencyLabel(ticket.departure) === segmentCurrencyLabel(ticket.arrival);
-  if (!sameCurrency) return dep + arr; // numeric sum still useful when currencies match amounts only
-  return dep + arr;
+  return segmentLineTotal(ticket.departure) + segmentLineTotal(ticket.arrival);
 }
 
 export function syncSegmentTicketPrice(segment: FlightSegment): FlightSegment {

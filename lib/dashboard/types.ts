@@ -47,7 +47,7 @@ export interface FlightSegment {
   connectingStay: string;
   /** Price per single ticket for this flight */
   unitPrice: string;
-  /** Currency for this flight price: PKR, SAR (Riyal), or OTHER */
+  /** Currency for this flight price */
   currency: TicketCurrency;
   /** Custom currency label when currency is OTHER */
   currencyOther: string;
@@ -59,7 +59,28 @@ export interface FlightSegment {
   mealIncluded: boolean;
 }
 
-export type TicketCurrency = "PKR" | "SAR" | "OTHER";
+export const TICKET_CURRENCY_OPTIONS = [
+  { value: "PKR", label: "PKR" },
+  { value: "SAR", label: "Riyal (SAR)" },
+  { value: "AED", label: "Dirham (AED)" },
+  { value: "QAR", label: "Qatari Riyal" },
+  { value: "BHD", label: "Bahraini Dinar" },
+  { value: "KWD", label: "Kuwaiti Dinar" },
+  { value: "OMR", label: "Omani Rial" },
+  { value: "USD", label: "US Dollar" },
+  { value: "EUR", label: "Euro" },
+  { value: "GBP", label: "British Pound" },
+  { value: "TRY", label: "Turkish Lira" },
+  { value: "INR", label: "Indian Rupee" },
+  { value: "BDT", label: "Bangladeshi Taka" },
+  { value: "MYR", label: "Malaysian Ringgit" },
+  { value: "SGD", label: "Singapore Dollar" },
+  { value: "CAD", label: "Canadian Dollar" },
+  { value: "AUD", label: "Australian Dollar" },
+  { value: "OTHER", label: "Other" },
+] as const;
+
+export type TicketCurrency = (typeof TICKET_CURRENCY_OPTIONS)[number]["value"];
 
 export interface TripTicket {
   /** Outbound / going flight */
@@ -70,12 +91,6 @@ export interface TripTicket {
   currency: string;
   notes: string;
 }
-
-export const TICKET_CURRENCY_OPTIONS: { value: TicketCurrency; label: string }[] = [
-  { value: "PKR", label: "PKR" },
-  { value: "SAR", label: "Riyal" },
-  { value: "OTHER", label: "Other" },
-];
 
 export interface TripVisa {
   status: VisaStatus;

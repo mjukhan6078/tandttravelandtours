@@ -11,7 +11,13 @@ import type {
   TripVisa,
   VisaStatus,
 } from "./types";
-import { defaultFlightSegment, defaultPayment, defaultTicket, defaultVisa } from "./types";
+import {
+  TICKET_CURRENCY_OPTIONS,
+  defaultFlightSegment,
+  defaultPayment,
+  defaultTicket,
+  defaultVisa,
+} from "./types";
 import { formatConnectingStay } from "./connecting";
 import { normalizeTicketCurrency, syncSegmentTicketPrice } from "./ticket-pricing";
 
@@ -59,10 +65,12 @@ export function sanitizeFlightSegment(input: unknown): FlightSegment {
       ? 1
       : 0;
   const currency = normalizeTicketCurrency(row.currency);
+  const knownCodes = new Set(TICKET_CURRENCY_OPTIONS.map((item) => item.value));
+  const rawCurrency = asString(row.currency).toUpperCase();
   const currencyOther =
     currency === "OTHER"
       ? asString(row.currencyOther) ||
-        (asString(row.currency) && !["PKR", "SAR", "OTHER", "RIYAL", "SR", "RS"].includes(asString(row.currency).toUpperCase())
+        (rawCurrency && !knownCodes.has(rawCurrency as typeof TICKET_CURRENCY_OPTIONS[number]["value"])
           ? asString(row.currency)
           : "")
       : "";

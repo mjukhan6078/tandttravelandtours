@@ -568,7 +568,7 @@ export default function TripDetailPage() {
                                 updateSegment({ currency: currency as TicketCurrency })
                               }
                             >
-                              <SelectTrigger className="w-[96px] rounded-l-none border-l-0">
+                              <SelectTrigger className="w-[118px] rounded-l-none border-l-0">
                                 <SelectValue />
                               </SelectTrigger>
                               <SelectContent>
@@ -592,28 +592,28 @@ export default function TripDetailPage() {
                         </div>
                         <div className="space-y-2">
                           <Label>Units</Label>
-                          <Select
+                          <Input
+                            type="number"
+                            min={1}
+                            max={50}
                             disabled={!ready}
                             value={
                               segment.ticketUnits > 0
-                                ? String(segment.ticketUnits)
+                                ? segment.ticketUnits
                                 : ready
-                                  ? "1"
-                                  : undefined
+                                  ? 1
+                                  : ""
                             }
-                            onValueChange={(v) => updateSegment({ ticketUnits: Number(v) })}
-                          >
-                            <SelectTrigger className="w-full">
-                              <SelectValue placeholder="Qty" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {Array.from({ length: 20 }, (_, i) => i + 1).map((units) => (
-                                <SelectItem key={units} value={String(units)}>
-                                  {units}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
+                            onChange={(e) =>
+                              updateSegment({
+                                ticketUnits: Math.max(
+                                  1,
+                                  Math.min(50, Number(e.target.value) || 1)
+                                ),
+                              })
+                            }
+                            placeholder="Qty"
+                          />
                         </div>
                         <div className="space-y-2">
                           <Label>Line total</Label>
