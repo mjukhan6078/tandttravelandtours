@@ -1,35 +1,21 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
-import { MapPin } from "lucide-react";
-
-interface PrayerTimes {
-  Fajr: string;
-  Dhuhr: string;
-  Asr: string;
-  Maghrib: string;
-  Isha: string;
-}
+import { useState, useEffect, useCallback, useRef } from "react";
+import { MapPin, ChevronDown } from "lucide-react";
 
 interface LocationConfig {
   city: string;
   country: string;
-  latitude: number;
-  longitude: number;
-  method: number;
 }
 
 const DEFAULT_LOCATION: LocationConfig = {
   city: "Karachi",
   country: "Pakistan",
-  latitude: 24.8607,
-  longitude: 67.0011,
-  method: 4,
 };
 
-const PRAYER_CACHE_KEY = "tandt_prayer_cache_v2";
 const LOCATION_KEY = "tandt_location_v2";
-const CACHE_TTL = 6 * 60 * 60 * 1000; // 6 hours
+const HIJRI_ADJUST_KEY = "tandt_hijri_adjust";
+const ADJUST_OPTIONS = [-2, -1, 0, 1, 2] as const;
 
 const HIJRI_MONTHS = [
   "Muharram",
@@ -46,85 +32,42 @@ const HIJRI_MONTHS = [
   "Dhu al-Hijjah",
 ];
 
-const PRAYER_NAMES = ["Fajr", "Dhuhr", "Asr", "Maghrib", "Isha"] as const;
-
-/** Strip API extras like "05:12 (PKT)" → "05:12" */
-function cleanTime(raw: string): string {
-  return raw.trim().split(" ")[0] ?? raw;
-}
-
-/** Convert 24h "HH:mm" to 12h "h:mm AM/PM" */
-function to12Hour(raw: string): string {
-  const time = cleanTime(raw);
-  const [hStr, mStr] = time.split(":");
-  let hours = Number(hStr);
-  const minutes = Number(mStr);
-  if (Number.isNaN(hours) || Number.isNaN(minutes)) return raw;
-
-  const period = hours >= 12 ? "PM" : "AM";
-  hours = hours % 12;
-  if (hours === 0) hours = 12;
-  return `${hours}:${String(minutes).padStart(2, "0")} ${period}`;
-}
-
-function parseTimeToToday(raw: string): Date {
-  const time = cleanTime(raw);
-  const [hours, minutes] = time.split(":").map(Number);
-  const date = new Date();
-  date.setHours(hours, minutes, 0, 0);
-  return date;
-}
-
 function getStoredLocation(): LocationConfig | null {
   if (typeof window === "undefined") return null;
   try {
     const stored = localStorage.getItem(LOCATION_KEY);
     if (!stored) return null;
     const parsed = JSON.parse(stored) as LocationConfig;
-    if (typeof parsed.latitude === "number" && typeof parsed.longitude === "number") {
-      return parsed;
-    }
+    if (parsed.city && parsed.country) return parsed;
   } catch {
     /* ignore */
   }
   return null;
 }
 
-function getCachedPrayerTimes(lat: number, lng: number): PrayerTimes | null {
-  if (typeof window === "undefined") return null;
+function getStoredHijriAdjust(): number {
+  if (typeof window === "undefined") return 0;
   try {
-    const cached = localStorage.getItem(PRAYER_CACHE_KEY);
-    if (!cached) return null;
-    const data = JSON.parse(cached) as {
-      timings: PrayerTimes;
-      timestamp: number;
-      latitude: number;
-      longitude: number;
-    };
-    const samePlace =
-      Math.abs(data.latitude - lat) < 0.01 && Math.abs(data.longitude - lng) < 0.01;
-    if (samePlace && Date.now() - data.timestamp < CACHE_TTL) {
-      return data.timings;
+    const stored = localStorage.getItem(HIJRI_ADJUST_KEY);
+    if (stored === null) return 0;
+    const value = Number(stored);
+    if (ADJUST_OPTIONS.includes(value as (typeof ADJUST_OPTIONS)[number])) {
+      return value;
     }
   } catch {
     /* ignore */
   }
-  return null;
+  return 0;
 }
 
-function setCachedPrayerTimes(timings: PrayerTimes, lat: number, lng: number): void {
-  localStorage.setItem(
-    PRAYER_CACHE_KEY,
-    JSON.stringify({
-      timings,
-      timestamp: Date.now(),
-      latitude: lat,
-      longitude: lng,
-    })
-  );
+function formatAdjustLabel(value: number) {
+  if (value === 0) return "Default date";
+  const abs = Math.abs(value);
+  const unit = abs === 1 ? "day" : "days";
+  return value > 0 ? `+${value} ${unit}` : `${value} ${unit}`;
 }
 
-async function reverseGeocode(lat: number, lng: number): Promise<{ city: string; country: string }> {
+async function reverseGeocode(lat: number, lng: number): Promise<LocationConfig> {
   try {
     const response = await fetch(
       `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}`,
@@ -146,99 +89,67 @@ async function reverseGeocode(lat: number, lng: number): Promise<{ city: string;
   }
 }
 
+function formatHijri(hijriData: {
+  day: string;
+  year: string;
+  month?: { english?: string; en?: string; number?: number };
+}): string {
+  const monthName =
+    hijriData.month?.english ||
+    hijriData.month?.en ||
+    (typeof hijriData.month?.number === "number"
+      ? HIJRI_MONTHS[hijriData.month.number - 1]
+      : null) ||
+    "Muharram";
+  return `${String(hijriData.day).padStart(2, "0")} / ${monthName} / ${hijriData.year}`;
+}
+
+/** Shift today's Gregorian date by offset days, then convert — this updates the Hijri date. */
+async function fetchHijriForToday(adjustment: number): Promise<string | null> {
+  try {
+    const target = new Date();
+    target.setHours(12, 0, 0, 0);
+    target.setDate(target.getDate() + adjustment);
+    const datePath = `${target.getDate()}-${target.getMonth() + 1}-${target.getFullYear()}`;
+    const response = await fetch(`https://api.aladhan.com/v1/gToH/${datePath}`);
+    const data = await response.json();
+    if (!data.data?.hijri) return null;
+    return formatHijri(data.data.hijri);
+  } catch {
+    return null;
+  }
+}
+
 export default function TopBar() {
-  const [currentPrayer, setCurrentPrayer] = useState("Asr");
-  const [nextPrayer, setNextPrayer] = useState("Maghrib");
-  const [nextPrayerTime, setNextPrayerTime] = useState("");
-  const [timeRemaining, setTimeRemaining] = useState("");
   const [hijriDate, setHijriDate] = useState("");
+  const [hijriAdjust, setHijriAdjust] = useState(0);
+  const [hijriOpen, setHijriOpen] = useState(false);
+  const [hijriLoading, setHijriLoading] = useState(false);
   const [gregorianDate, setGregorianDate] = useState("");
-  const [prayerTimes, setPrayerTimes] = useState<PrayerTimes | null>(null);
   const [location, setLocation] = useState<LocationConfig>(DEFAULT_LOCATION);
   const [liveTime, setLiveTime] = useState("");
   const [locationStatus, setLocationStatus] = useState<"idle" | "asking" | "ready" | "denied">(
     "idle"
   );
+  const hijriPopoverRef = useRef<HTMLDivElement>(null);
 
-  const deriveCurrentAndNext = useCallback((timings: PrayerTimes) => {
-    const now = new Date();
-    let found = false;
-
-    for (let i = 0; i < PRAYER_NAMES.length; i++) {
-      const prayerName = PRAYER_NAMES[i];
-      const prayerDate = parseTimeToToday(timings[prayerName]);
-
-      if (prayerDate > now) {
-        setNextPrayer(prayerName);
-        setNextPrayerTime(cleanTime(timings[prayerName]));
-        setCurrentPrayer(i > 0 ? PRAYER_NAMES[i - 1] : "Isha");
-        found = true;
-        break;
-      }
-    }
-
-    if (!found) {
-      setCurrentPrayer("Isha");
-      setNextPrayer("Fajr");
-      setNextPrayerTime(cleanTime(timings.Fajr));
-    }
+  const loadHijriDate = useCallback(async (adjustment: number) => {
+    setHijriLoading(true);
+    const hijri = await fetchHijriForToday(adjustment);
+    if (hijri) setHijriDate(hijri);
+    setHijriLoading(false);
   }, []);
 
-  const loadPrayerTimes = useCallback(
-    async (loc: LocationConfig) => {
-      const cached = getCachedPrayerTimes(loc.latitude, loc.longitude);
-      if (cached) {
-        setPrayerTimes(cached);
-        deriveCurrentAndNext(cached);
-        return;
-      }
-
-      try {
-        const response = await fetch(
-          `https://api.aladhan.com/v1/timings?latitude=${loc.latitude}&longitude=${loc.longitude}&method=${loc.method}`
-        );
-        const data = await response.json();
-        if (data.data?.timings) {
-          const timings: PrayerTimes = {
-            Fajr: cleanTime(data.data.timings.Fajr),
-            Dhuhr: cleanTime(data.data.timings.Dhuhr),
-            Asr: cleanTime(data.data.timings.Asr),
-            Maghrib: cleanTime(data.data.timings.Maghrib),
-            Isha: cleanTime(data.data.timings.Isha),
-          };
-          setPrayerTimes(timings);
-          setCachedPrayerTimes(timings, loc.latitude, loc.longitude);
-          deriveCurrentAndNext(timings);
-        }
-      } catch {
-        /* keep previous / empty */
-      }
-    },
-    [deriveCurrentAndNext]
-  );
-
-  const applyLocation = useCallback(
-    async (latitude: number, longitude: number) => {
-      const { city, country } = await reverseGeocode(latitude, longitude);
-      const next: LocationConfig = {
-        city,
-        country,
-        latitude,
-        longitude,
-        method: 4,
-      };
-      setLocation(next);
-      localStorage.setItem(LOCATION_KEY, JSON.stringify(next));
-      setLocationStatus("ready");
-      await loadPrayerTimes(next);
-    },
-    [loadPrayerTimes]
-  );
+  const applyLocation = useCallback(async (latitude: number, longitude: number) => {
+    const next = await reverseGeocode(latitude, longitude);
+    setLocation(next);
+    localStorage.setItem(LOCATION_KEY, JSON.stringify(next));
+    setLocationStatus("ready");
+  }, []);
 
   const requestLocation = useCallback(() => {
     if (typeof window === "undefined" || !("geolocation" in navigator)) {
       setLocationStatus("denied");
-      loadPrayerTimes(DEFAULT_LOCATION);
       return;
     }
 
@@ -250,9 +161,7 @@ export default function TopBar() {
       () => {
         setLocationStatus("denied");
         const stored = getStoredLocation();
-        const fallback = stored ?? DEFAULT_LOCATION;
-        setLocation(fallback);
-        loadPrayerTimes(fallback);
+        if (stored) setLocation(stored);
       },
       {
         enableHighAccuracy: false,
@@ -260,79 +169,28 @@ export default function TopBar() {
         maximumAge: 30 * 60 * 1000,
       }
     );
-  }, [applyLocation, loadPrayerTimes]);
+  }, [applyLocation]);
 
-  // Ask for location on mount (browser permission prompt)
   useEffect(() => {
     const stored = getStoredLocation();
     if (stored) {
       setLocation(stored);
       setLocationStatus("ready");
-      loadPrayerTimes(stored);
-    } else {
-      setLocation(DEFAULT_LOCATION);
-      loadPrayerTimes(DEFAULT_LOCATION);
     }
-    // Always prompt / refresh GPS so times match real location
     requestLocation();
-  }, [loadPrayerTimes, requestLocation]);
+  }, [requestLocation]);
 
   useEffect(() => {
-    const fetchHijriDate = async () => {
-      try {
-        const today = new Date();
-        const cacheKey = `tandt_hijri_${today.toDateString()}`;
-        const cached = localStorage.getItem(cacheKey);
-        if (cached) {
-          setHijriDate(cached);
-          return;
-        }
-        const response = await fetch(
-          `https://api.aladhan.com/v1/gToH/${today.getDate()}-${today.getMonth() + 1}-${today.getFullYear()}`
-        );
-        const data = await response.json();
-        if (data.data?.hijri) {
-          const hijriData = data.data.hijri;
-          const monthName =
-            hijriData.month?.english ||
-            (typeof hijriData.month === "object"
-              ? HIJRI_MONTHS[(hijriData.month as { number: number }).number - 1]
-              : null) ||
-            "Muharram";
-          const hijri = `${String(hijriData.day).padStart(2, "0")} / ${monthName} / ${hijriData.year}`;
-          setHijriDate(hijri);
-          localStorage.setItem(cacheKey, hijri);
-        }
-      } catch {
-        /* optional */
-      }
-    };
+    const storedAdjust = getStoredHijriAdjust();
+    setHijriAdjust(storedAdjust);
+    loadHijriDate(storedAdjust);
 
-    fetchHijriDate();
     const today = new Date();
     const day = String(today.getDate()).padStart(2, "0");
     const month = today.toLocaleDateString("en-US", { month: "long" });
     const year = today.getFullYear();
     setGregorianDate(`${day} ${month} ${year}`);
-  }, []);
-
-  useEffect(() => {
-    const calculateTimeRemaining = () => {
-      if (!nextPrayerTime) return;
-      const now = new Date();
-      const nextPrayerDate = parseTimeToToday(nextPrayerTime);
-      if (nextPrayerDate <= now) {
-        nextPrayerDate.setDate(nextPrayerDate.getDate() + 1);
-      }
-      const diff = nextPrayerDate.getTime() - now.getTime();
-      const h = Math.floor(diff / (1000 * 60 * 60));
-      const m = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
-      setTimeRemaining(`${h}h ${m}m`);
-    };
-    calculateTimeRemaining();
-    const interval = setInterval(calculateTimeRemaining, 60000);
-    return () => clearInterval(interval);
-  }, [nextPrayerTime]);
+  }, [loadHijriDate]);
 
   useEffect(() => {
     const updateClock = () => {
@@ -350,96 +208,120 @@ export default function TopBar() {
     return () => clearInterval(interval);
   }, []);
 
-  const datesBlock = (
-    <div className="flex items-center gap-1 text-[10px] sm:text-xs whitespace-nowrap shrink-0">
-      {hijriDate && (
-        <>
-          <span className="text-secondary font-medium hidden sm:inline">{hijriDate}</span>
-          <span className="text-foreground/50 hidden sm:inline">·</span>
-        </>
-      )}
-      <span className="text-foreground/70">{gregorianDate}</span>
-    </div>
-  );
+  useEffect(() => {
+    if (!hijriOpen) return;
+
+    const onPointerDown = (event: MouseEvent) => {
+      if (!hijriPopoverRef.current?.contains(event.target as Node)) {
+        setHijriOpen(false);
+      }
+    };
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setHijriOpen(false);
+    };
+
+    document.addEventListener("mousedown", onPointerDown);
+    document.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.removeEventListener("mousedown", onPointerDown);
+      document.removeEventListener("keydown", onKeyDown);
+    };
+  }, [hijriOpen]);
+
+  const selectHijriAdjust = async (value: number) => {
+    setHijriAdjust(value);
+    localStorage.setItem(HIJRI_ADJUST_KEY, String(value));
+    setHijriOpen(false);
+    await loadHijriDate(value);
+  };
 
   return (
-    <div className="bg-background/90 backdrop-blur-xl overflow-hidden relative">
+    <div className="bg-background/90 backdrop-blur-xl relative z-50">
       <div className="absolute inset-0 bg-gradient-to-b from-white/30 via-transparent to-white/10 pointer-events-none" />
       <div className="absolute inset-0 bg-gradient-to-r from-secondary/5 via-transparent to-secondary/5 pointer-events-none" />
       <div className="h-[1px] absolute bottom-0 left-0 right-0 bg-gradient-to-r from-transparent via-secondary to-transparent opacity-50" />
 
-      <div className="w-full px-3 sm:px-4 py-2 flex flex-col xl:flex-row xl:items-center xl:justify-between gap-2 xl:gap-4 text-sm">
-        <div className="flex items-center justify-between gap-2 xl:shrink-0 min-w-0 h-full">
-          <div className="flex items-center gap-2 sm:gap-4 shrink-0 min-w-0 h-full">
-            {liveTime && (
-              <span className="text-secondary font-mono font-bold text-[10px] sm:text-xs whitespace-nowrap">
-                {liveTime}
-              </span>
+      <div className="w-full px-3 sm:px-4 py-2 flex items-center justify-between gap-3 text-sm relative z-10">
+        <div className="flex items-center gap-2 sm:gap-4 min-w-0">
+          {liveTime && (
+            <span className="text-secondary font-mono font-bold text-[10px] sm:text-xs whitespace-nowrap">
+              {liveTime}
+            </span>
+          )}
+          <div className="text-foreground/70 text-[10px] sm:text-xs whitespace-nowrap flex items-center gap-1.5 min-w-0">
+            <MapPin className="h-3 w-3 text-secondary shrink-0" />
+            <span className="text-secondary font-medium truncate">{location.city}</span>
+            <span className="text-foreground/50">/</span>
+            <span className="text-foreground/70 truncate">{location.country}</span>
+            {locationStatus === "asking" && (
+              <span className="text-foreground/40 ml-1">(locating…)</span>
             )}
-            <div className="text-foreground/70 text-[10px] sm:text-xs whitespace-nowrap flex items-center gap-1.5">
-              <MapPin className="h-3 w-3 text-secondary shrink-0" />
-              <span className="text-secondary font-medium">{location.city}</span>
-              <span className="text-foreground/50">/</span>
-              <span className="text-foreground/70">{location.country}</span>
-              {locationStatus === "asking" && (
-                <span className="text-foreground/40 ml-1">(locating…)</span>
-              )}
-              {locationStatus === "denied" && (
-                <button
-                  type="button"
-                  onClick={requestLocation}
-                  className="ml-1 text-secondary underline underline-offset-2 hover:text-primary"
-                >
-                  Use my location
-                </button>
-              )}
-            </div>
+            {locationStatus === "denied" && (
+              <button
+                type="button"
+                onClick={requestLocation}
+                className="ml-1 text-secondary underline underline-offset-2 hover:text-primary"
+              >
+                Use my location
+              </button>
+            )}
           </div>
-          <div className="xl:hidden">{datesBlock}</div>
         </div>
 
-        {prayerTimes && (
-          <div className="flex items-center gap-2 sm:gap-3 min-w-0 xl:flex-1 xl:justify-center overflow-x-auto [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden h-full">
-            <div className="flex items-center gap-2 sm:gap-3 shrink-0">
-              {PRAYER_NAMES.map((p) => {
-                const isActive = p === currentPrayer;
-                return (
-                  <span
-                    key={p}
-                    className="flex items-center gap-0.5 sm:gap-1 whitespace-nowrap shrink-0 text-[10px] sm:text-xs"
-                  >
-                    <span
-                      className={
-                        isActive ? "text-secondary font-bold" : "text-foreground/60 font-medium"
-                      }
-                    >
-                      {p}
-                    </span>
-                    <span className="text-foreground/50">:</span>
-                    <span
-                      className={
-                        isActive ? "text-secondary font-bold" : "text-foreground/70 font-medium"
-                      }
-                    >
-                      {to12Hour(prayerTimes[p])}
-                    </span>
+        <div className="flex items-center gap-1 text-[10px] sm:text-xs whitespace-nowrap shrink-0">
+          {hijriDate && (
+            <>
+              <div className="relative" ref={hijriPopoverRef}>
+                <button
+                  type="button"
+                  onClick={() => setHijriOpen((open) => !open)}
+                  className="inline-flex items-center gap-1 text-secondary font-medium hover:text-primary transition-colors max-w-[46vw] sm:max-w-none"
+                  aria-haspopup="dialog"
+                  aria-expanded={hijriOpen}
+                  title="Adjust Hijri date"
+                >
+                  <span className={`truncate ${hijriLoading ? "opacity-60" : ""}`}>
+                    {hijriDate}
                   </span>
-                );
-              })}
-            </div>
-            {timeRemaining && (
-              <div className="flex items-center gap-1 ml-1 pl-2 sm:ml-3 sm:pl-3 border-l border-foreground/10 shrink-0 whitespace-nowrap text-[10px] sm:text-xs">
-                <span className="text-foreground/40">Next:</span>
-                <span className="text-secondary font-bold">{nextPrayer}</span>
-                <span className="text-foreground/50">
-                  {to12Hour(nextPrayerTime)} · in {timeRemaining}
-                </span>
-              </div>
-            )}
-          </div>
-        )}
+                  {hijriAdjust !== 0 && (
+                    <span className="text-[9px] text-foreground/50 shrink-0">
+                      ({hijriAdjust > 0 ? `+${hijriAdjust}` : hijriAdjust})
+                    </span>
+                  )}
+                </button>
 
-        <div className="hidden xl:flex items-center shrink-0 h-full">{datesBlock}</div>
+                {hijriOpen && (
+                  <div className="absolute right-0 top-full mt-2 w-48 rounded-lg border border-border bg-background shadow-lg p-2 z-[60]">
+                    <p className="px-2 pb-2 text-[10px] text-muted-foreground">
+                      Update Hijri date
+                    </p>
+                    <div className="flex flex-col gap-0.5">
+                      {ADJUST_OPTIONS.map((value) => {
+                        const selected = value === hijriAdjust;
+                        return (
+                          <button
+                            key={value}
+                            type="button"
+                            onClick={() => selectHijriAdjust(value)}
+                            className={`rounded-md px-2 py-1.5 text-left text-xs transition-colors ${
+                              selected
+                                ? "bg-primary text-primary-foreground"
+                                : "text-foreground hover:bg-muted"
+                            }`}
+                          >
+                            {formatAdjustLabel(value)}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+              </div>
+              <span className="text-foreground/50">·</span>
+            </>
+          )}
+          <span className="text-foreground/70">{gregorianDate}</span>
+        </div>
       </div>
     </div>
   );
