@@ -28,7 +28,7 @@ export default function Contact() {
                   <p className="text-muted-foreground mb-4">Message us directly on WhatsApp</p>
                   <Button className="w-full bg-green-600 hover:bg-green-700">
                     <a
-                      href="https://wa.me/966500000000"
+                      href="https://wa.me/923002062324"
                       target="_blank"
                       rel="noopener noreferrer"
                       className="flex items-center justify-center"
