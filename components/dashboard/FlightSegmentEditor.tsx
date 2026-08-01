@@ -42,6 +42,7 @@ export default function FlightSegmentEditor({
       );
     } else {
       next.connectingAirport = "";
+      next.connectingTime = "";
       next.connectingDuration = "";
       next.connectingStay = "";
     }
@@ -119,6 +120,12 @@ export default function FlightSegmentEditor({
             onChange={(departureAirport) => patch({ departureAirport })}
             placeholder="Departure airport"
           />
+          <Input
+            type="time"
+            value={value.departureTime || ""}
+            onChange={(e) => patch({ departureTime: e.target.value })}
+            aria-label="Departure time"
+          />
         </div>
 
         {value.flightType === "connecting" && (
@@ -129,6 +136,12 @@ export default function FlightSegmentEditor({
                 value={value.connectingAirport || ""}
                 onChange={(connectingAirport) => patch({ connectingAirport })}
                 placeholder="Connecting airport"
+              />
+              <Input
+                type="time"
+                value={value.connectingTime || ""}
+                onChange={(e) => patch({ connectingTime: e.target.value })}
+                aria-label="Via time"
               />
             </div>
             <div className="space-y-2">
@@ -154,6 +167,12 @@ export default function FlightSegmentEditor({
             value={value.arrivalAirport}
             onChange={(arrivalAirport) => patch({ arrivalAirport })}
             placeholder="Arrival airport"
+          />
+          <Input
+            type="time"
+            value={value.arrivalTime || ""}
+            onChange={(e) => patch({ arrivalTime: e.target.value })}
+            aria-label="Arrival time"
           />
         </div>
       </div>

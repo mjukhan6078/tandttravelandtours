@@ -33,6 +33,7 @@ export function sanitizeFlightSegment(input: unknown): FlightSegment {
   const flightType: FlightType = row.flightType === "connecting" ? "connecting" : "direct";
   const connectingAirport =
     flightType === "connecting" ? asString(row.connectingAirport).toUpperCase() : "";
+  const connectingTime = flightType === "connecting" ? asString(row.connectingTime) : "";
   const connectingDuration =
     flightType === "connecting" ? asString(row.connectingDuration) : "";
   const connectingStay =
@@ -45,9 +46,12 @@ export function sanitizeFlightSegment(input: unknown): FlightSegment {
     airline: asString(row.airline),
     flightNumber: asString(row.flightNumber),
     departureAirport: asString(row.departureAirport).toUpperCase(),
+    departureTime: asString(row.departureTime),
     arrivalAirport: asString(row.arrivalAirport).toUpperCase(),
+    arrivalTime: asString(row.arrivalTime),
     flightType,
     connectingAirport,
+    connectingTime,
     connectingDuration,
     connectingStay,
   };

@@ -29,10 +29,16 @@ export interface FlightSegment {
   airline: string;
   flightNumber: string;
   departureAirport: string;
+  /** Local departure time HH:mm */
+  departureTime: string;
   arrivalAirport: string;
+  /** Local arrival time HH:mm */
+  arrivalTime: string;
   flightType: FlightType;
   /** Connecting airport IATA code when flight is connecting */
   connectingAirport: string;
+  /** Local via / connection time HH:mm */
+  connectingTime: string;
   /** Layover duration in hours, e.g. "4h" */
   connectingDuration: string;
   /** Summary: via {airport} · {duration} */
@@ -186,9 +192,12 @@ export function defaultFlightSegment(): FlightSegment {
     airline: "",
     flightNumber: "",
     departureAirport: "",
+    departureTime: "",
     arrivalAirport: "",
+    arrivalTime: "",
     flightType: "direct",
     connectingAirport: "",
+    connectingTime: "",
     connectingDuration: "",
     connectingStay: "",
   };
