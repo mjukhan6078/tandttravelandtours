@@ -319,7 +319,13 @@ export function toPublicTrip(trip: Trip, options?: { includeApiKey?: boolean }) 
     totalNights: totals.totalNights,
     notes: normalized.notes,
     status: normalized.status,
-    ticket: normalized.ticket,
+    ticket: {
+      ...normalized.ticket,
+      totalTicketPrice: String(
+        (Number(normalized.ticket.departure.ticketPrice) || 0) +
+          (Number(normalized.ticket.arrival.ticketPrice) || 0) || ""
+      ),
+    },
     visa: {
       ...normalized.visa,
       approved: normalized.visa.status === "approved",

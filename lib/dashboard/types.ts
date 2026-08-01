@@ -45,6 +45,8 @@ export interface FlightSegment {
   connectingDepartureTime: string;
   /** Summary: via {airport} · {duration} */
   connectingStay: string;
+  /** Price for this flight direction */
+  ticketPrice: string;
 }
 
 export interface TripTicket {
@@ -52,7 +54,6 @@ export interface TripTicket {
   departure: FlightSegment;
   /** Return / coming-back flight (can differ from departure) */
   arrival: FlightSegment;
-  ticketPrice: string;
   currency: string;
   luggageAllowance: string;
   mealIncluded: boolean;
@@ -203,6 +204,7 @@ export function defaultFlightSegment(): FlightSegment {
     connectingDuration: "",
     connectingDepartureTime: "",
     connectingStay: "",
+    ticketPrice: "",
   };
 }
 
@@ -210,7 +212,6 @@ export function defaultTicket(): TripTicket {
   return {
     departure: defaultFlightSegment(),
     arrival: defaultFlightSegment(),
-    ticketPrice: "",
     currency: "PKR",
     luggageAllowance: "",
     mealIncluded: false,

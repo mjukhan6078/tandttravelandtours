@@ -473,18 +473,23 @@ export default function TripDetailPage() {
 
                 <div className="grid sm:grid-cols-2 gap-4 rounded-lg border border-border p-4">
                   <div className="space-y-2">
-                    <Label>Ticket price</Label>
-                    <Input
-                      value={ticket.ticketPrice}
-                      onChange={(e) => setTicket({ ...ticket, ticketPrice: e.target.value })}
-                      placeholder="e.g. 185000"
-                    />
-                  </div>
-                  <div className="space-y-2">
                     <Label>Currency</Label>
                     <Input
                       value={ticket.currency}
                       onChange={(e) => setTicket({ ...ticket, currency: e.target.value })}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Total ticket price</Label>
+                    <Input
+                      readOnly
+                      value={(() => {
+                        const dep = Number(ticket.departure.ticketPrice) || 0;
+                        const ret = Number(ticket.arrival.ticketPrice) || 0;
+                        const total = dep + ret;
+                        return total > 0 ? String(total) : "";
+                      })()}
+                      placeholder="Auto from departure + return"
                     />
                   </div>
                   <div className="space-y-2 sm:col-span-2">

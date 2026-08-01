@@ -60,6 +60,7 @@ export function sanitizeFlightSegment(input: unknown): FlightSegment {
     connectingDuration,
     connectingDepartureTime,
     connectingStay,
+    ticketPrice: asString(row.ticketPrice),
   };
 }
 
@@ -73,6 +74,7 @@ function legacySegmentFromFlat(row: Record<string, unknown>): FlightSegment {
     connectingAirport: row.connectingAirport,
     connectingDuration: row.connectingDuration,
     connectingStay: row.connectingStay,
+    ticketPrice: row.ticketPrice,
   });
 }
 
@@ -82,17 +84,22 @@ export function sanitizeTicket(input: unknown): TripTicket {
   const row = input as Partial<TripTicket> & Record<string, unknown>;
 
   const hasSegments = row.departure != null || row.arrival != null;
-  const departure = hasSegments
+  let departure = hasSegments
     ? sanitizeFlightSegment(row.departure)
     : legacySegmentFromFlat(row);
-  const arrival = hasSegments
+  let arrival = hasSegments
     ? sanitizeFlightSegment(row.arrival)
     : defaultFlightSegment();
+
+  // Migrate old single ticketPrice onto departure if segments have no prices
+  const legacyPrice = asString(row.ticketPrice);
+  if (legacyPrice && !departure.ticketPrice && !arrival.ticketPrice) {
+    departure = { ...departure, ticketPrice: legacyPrice };
+  }
 
   return {
     departure,
     arrival,
-    ticketPrice: asString(row.ticketPrice),
     currency: asString(row.currency) || "PKR",
     luggageAllowance: asString(row.luggageAllowance),
     mealIncluded: asBool(row.mealIncluded),

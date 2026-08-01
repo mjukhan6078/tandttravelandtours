@@ -123,13 +123,21 @@ export default function FlightSegmentEditor({
             placeholder="e.g. SV 724"
           />
         </div>
-        <div className="space-y-2 sm:col-span-2">
+        <div className="space-y-2">
+          <Label>Ticket price</Label>
+          <Input
+            value={value.ticketPrice}
+            onChange={(e) => patch({ ticketPrice: e.target.value })}
+            placeholder="e.g. 95000"
+          />
+        </div>
+        <div className="space-y-2">
           <Label>Flight type</Label>
           <Select
             value={value.flightType}
             onValueChange={(flightType) => patch({ flightType: flightType as FlightType })}
           >
-            <SelectTrigger className="w-full sm:max-w-xs">
+            <SelectTrigger className="w-full">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
