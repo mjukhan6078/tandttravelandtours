@@ -13,6 +13,7 @@ import type {
 } from "./types";
 import { defaultFlightSegment, defaultPayment, defaultTicket, defaultVisa } from "./types";
 import { formatConnectingStay } from "./connecting";
+import { syncSegmentTicketPrice } from "./ticket-pricing";
 
 function newHotelId() {
   return `hotel_${randomBytes(4).toString("hex")}`;
@@ -47,7 +48,18 @@ export function sanitizeFlightSegment(input: unknown): FlightSegment {
         asString(row.connectingStay)
       : "";
 
-  return {
+  const unitPrice =
+    asString(row.unitPrice) ||
+    // legacy: old ticketPrice treated as unit price when units missing
+    (!row.ticketUnits && asString(row.ticketPrice) ? asString(row.ticketPrice) : "");
+  const ticketUnitsRaw = Number(row.ticketUnits);
+  const ticketUnits = Number.isFinite(ticketUnitsRaw)
+    ? Math.max(0, Math.min(50, Math.floor(ticketUnitsRaw)))
+    : unitPrice
+      ? 1
+      : 0;
+
+  return syncSegmentTicketPrice({
     airline: asString(row.airline),
     flightNumber: asString(row.flightNumber),
     departureAirport: asString(row.departureAirport).toUpperCase(),
@@ -60,10 +72,12 @@ export function sanitizeFlightSegment(input: unknown): FlightSegment {
     connectingDuration,
     connectingDepartureTime,
     connectingStay,
+    unitPrice,
+    ticketUnits,
     ticketPrice: asString(row.ticketPrice),
     luggageAllowance: asString(row.luggageAllowance),
     mealIncluded: asBool(row.mealIncluded),
-  };
+  });
 }
 
 function legacySegmentFromFlat(row: Record<string, unknown>): FlightSegment {
@@ -95,11 +109,24 @@ export function sanitizeTicket(input: unknown): TripTicket {
     ? sanitizeFlightSegment(row.arrival)
     : defaultFlightSegment();
 
-  // Migrate old single ticketPrice onto departure if segments have no prices
+  // Migrate old single ticketPrice onto departure unit price if segments have no prices
   const legacyPrice = asString(row.ticketPrice);
-  if (legacyPrice && !departure.ticketPrice && !arrival.ticketPrice) {
-    departure = { ...departure, ticketPrice: legacyPrice };
+  if (
+    legacyPrice &&
+    !departure.unitPrice &&
+    !arrival.unitPrice &&
+    !departure.ticketPrice &&
+    !arrival.ticketPrice
+  ) {
+    departure = syncSegmentTicketPrice({
+      ...departure,
+      unitPrice: legacyPrice,
+      ticketUnits: departure.ticketUnits || 1,
+    });
   }
+
+  departure = syncSegmentTicketPrice(departure);
+  arrival = syncSegmentTicketPrice(arrival);
 
   // Migrate old shared luggage/meal onto both segments when missing
   const legacyLuggage = asString(row.luggageAllowance);

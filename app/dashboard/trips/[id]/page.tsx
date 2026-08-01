@@ -29,6 +29,13 @@ import {
   nightsBetween,
 } from "@/lib/dashboard/duration";
 import {
+  formatMoneyAmount,
+  segmentHasFlightDetails,
+  segmentLineTotal,
+  syncSegmentTicketPrice,
+  ticketGrandTotal,
+} from "@/lib/dashboard/ticket-pricing";
+import {
   PAYMENT_STATUS_LABELS,
   TRIP_STATUS_LABELS,
   VISA_STATUS_LABELS,
@@ -37,6 +44,7 @@ import {
   defaultTicket,
   defaultVisa,
   type DocumentType,
+  type FlightSegment,
   type PaymentStatus,
   type TripHotel,
   type TripPayment,
@@ -461,70 +469,156 @@ export default function TripDetailPage() {
                   title="Departure flight"
                   hint="Outbound flight going to Saudi Arabia."
                   value={ticket.departure}
-                  onChange={(departure) => setTicket({ ...ticket, departure })}
+                  onChange={(departure) =>
+                    setTicket({
+                      ...ticket,
+                      departure: syncSegmentTicketPrice({
+                        ...departure,
+                        ticketUnits:
+                          departure.ticketUnits > 0
+                            ? departure.ticketUnits
+                            : segmentHasFlightDetails(departure)
+                              ? 1
+                              : 0,
+                      }),
+                    })
+                  }
                 />
 
                 <FlightSegmentEditor
                   title="Arrival flight"
                   hint="Return flight coming back — can differ from departure."
                   value={ticket.arrival}
-                  onChange={(arrival) => setTicket({ ...ticket, arrival })}
+                  onChange={(arrival) =>
+                    setTicket({
+                      ...ticket,
+                      arrival: syncSegmentTicketPrice({
+                        ...arrival,
+                        ticketUnits:
+                          arrival.ticketUnits > 0
+                            ? arrival.ticketUnits
+                            : segmentHasFlightDetails(arrival)
+                              ? 1
+                              : 0,
+                      }),
+                    })
+                  }
                 />
 
-                <div className="grid sm:grid-cols-2 gap-4 rounded-lg border border-border p-4">
-                  <div className="space-y-2">
-                    <Label>Departure flight price</Label>
-                    <Input
-                      value={ticket.departure.ticketPrice}
-                      onChange={(e) =>
-                        setTicket({
-                          ...ticket,
-                          departure: { ...ticket.departure, ticketPrice: e.target.value },
-                        })
-                      }
-                      placeholder="e.g. 95000"
-                    />
+                <div className="space-y-4 rounded-lg border border-border p-4">
+                  <div>
+                    <p className="text-sm font-semibold">Ticket pricing</p>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Enter unit price and number of tickets for each flight. Totals update
+                      automatically.
+                    </p>
                   </div>
-                  <div className="space-y-2">
-                    <Label>Return flight price</Label>
-                    <Input
-                      value={ticket.arrival.ticketPrice}
-                      onChange={(e) =>
-                        setTicket({
-                          ...ticket,
-                          arrival: { ...ticket.arrival, ticketPrice: e.target.value },
-                        })
-                      }
-                      placeholder="e.g. 90000"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Currency</Label>
-                    <Input
-                      value={ticket.currency}
-                      onChange={(e) => setTicket({ ...ticket, currency: e.target.value })}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Total ticket price</Label>
-                    <Input
-                      readOnly
-                      value={(() => {
-                        const dep = Number(ticket.departure.ticketPrice) || 0;
-                        const ret = Number(ticket.arrival.ticketPrice) || 0;
-                        const total = dep + ret;
-                        return total > 0 ? String(total) : "";
-                      })()}
-                      placeholder="Auto from departure + return"
-                    />
-                  </div>
-                  <div className="space-y-2 sm:col-span-2">
-                    <Label>Ticket notes</Label>
-                    <Textarea
-                      rows={2}
-                      value={ticket.notes}
-                      onChange={(e) => setTicket({ ...ticket, notes: e.target.value })}
-                    />
+
+                  {(
+                    [
+                      ["departure", "Departure flight"],
+                      ["arrival", "Return flight"],
+                    ] as const
+                  ).map(([key, label]) => {
+                    const segment = ticket[key];
+                    const ready = segmentHasFlightDetails(segment);
+                    const updateSegment = (partial: Partial<FlightSegment>) => {
+                      const next = syncSegmentTicketPrice({ ...segment, ...partial });
+                      setTicket({ ...ticket, [key]: next });
+                    };
+                    return (
+                      <div
+                        key={key}
+                        className={`grid sm:grid-cols-[1.2fr_1fr_100px_1fr] gap-3 items-end rounded-md border border-border p-3 ${
+                          ready ? "bg-muted/20" : "bg-muted/10 opacity-70"
+                        }`}
+                      >
+                        <div className="space-y-1 min-w-0">
+                          <Label>{label}</Label>
+                          <p className="text-xs text-muted-foreground truncate">
+                            {ready
+                              ? [
+                                  segment.airline,
+                                  segment.flightNumber,
+                                  segment.departureAirport &&
+                                    `${segment.departureAirport} → ${segment.arrivalAirport || "—"}`,
+                                ]
+                                  .filter(Boolean)
+                                  .join(" · ")
+                              : "Enter flight details above to price this flight"}
+                          </p>
+                        </div>
+                        <div className="space-y-2">
+                          <Label>Unit price</Label>
+                          <Input
+                            disabled={!ready}
+                            value={segment.unitPrice}
+                            onChange={(e) => updateSegment({ unitPrice: e.target.value })}
+                            placeholder="Price per ticket"
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label>Units</Label>
+                          <Select
+                            disabled={!ready}
+                            value={
+                              segment.ticketUnits > 0
+                                ? String(segment.ticketUnits)
+                                : ready
+                                  ? "1"
+                                  : undefined
+                            }
+                            onValueChange={(v) => updateSegment({ ticketUnits: Number(v) })}
+                          >
+                            <SelectTrigger className="w-full">
+                              <SelectValue placeholder="Qty" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {Array.from({ length: 20 }, (_, i) => i + 1).map((units) => (
+                                <SelectItem key={units} value={String(units)}>
+                                  {units}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div className="space-y-2">
+                          <Label>Line total</Label>
+                          <Input
+                            readOnly
+                            disabled={!ready}
+                            value={formatMoneyAmount(segmentLineTotal(segment))}
+                            placeholder="Auto"
+                          />
+                        </div>
+                      </div>
+                    );
+                  })}
+
+                  <div className="grid sm:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label>Currency</Label>
+                      <Input
+                        value={ticket.currency}
+                        onChange={(e) => setTicket({ ...ticket, currency: e.target.value })}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Grand total</Label>
+                      <Input
+                        readOnly
+                        value={formatMoneyAmount(ticketGrandTotal(ticket))}
+                        placeholder="Auto from all tickets"
+                      />
+                    </div>
+                    <div className="space-y-2 sm:col-span-2">
+                      <Label>Ticket notes</Label>
+                      <Textarea
+                        rows={2}
+                        value={ticket.notes}
+                        onChange={(e) => setTicket({ ...ticket, notes: e.target.value })}
+                      />
+                    </div>
                   </div>
                 </div>
 

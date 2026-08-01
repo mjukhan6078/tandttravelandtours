@@ -325,6 +325,14 @@ export function toPublicTrip(trip: Trip, options?: { includeApiKey?: boolean }) 
         (Number(normalized.ticket.departure.ticketPrice) || 0) +
           (Number(normalized.ticket.arrival.ticketPrice) || 0) || ""
       ),
+      departure: {
+        ...normalized.ticket.departure,
+        lineTotal: normalized.ticket.departure.ticketPrice,
+      },
+      arrival: {
+        ...normalized.ticket.arrival,
+        lineTotal: normalized.ticket.arrival.ticketPrice,
+      },
     },
     visa: {
       ...normalized.visa,

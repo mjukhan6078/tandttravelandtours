@@ -45,7 +45,11 @@ export interface FlightSegment {
   connectingDepartureTime: string;
   /** Summary: via {airport} · {duration} */
   connectingStay: string;
-  /** Price for this flight direction */
+  /** Price per single ticket for this flight */
+  unitPrice: string;
+  /** Number of tickets for this same flight */
+  ticketUnits: number;
+  /** Auto total for this flight: unitPrice × ticketUnits */
   ticketPrice: string;
   luggageAllowance: string;
   mealIncluded: boolean;
@@ -204,6 +208,8 @@ export function defaultFlightSegment(): FlightSegment {
     connectingDuration: "",
     connectingDepartureTime: "",
     connectingStay: "",
+    unitPrice: "",
+    ticketUnits: 1,
     ticketPrice: "",
     luggageAllowance: "",
     mealIncluded: false,
