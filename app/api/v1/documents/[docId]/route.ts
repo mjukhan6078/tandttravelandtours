@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
-import { promises as fs } from "fs";
-import { getTripByApiKey, getUploadPath, listTrips } from "@/lib/dashboard/store";
+import { getDocumentBytes, getTripByApiKey, listTrips } from "@/lib/dashboard/store";
 
 type Params = { params: Promise<{ docId: string }> };
 
@@ -9,7 +8,11 @@ function extractApiKey(request: Request) {
   if (header?.toLowerCase().startsWith("bearer ")) {
     return header.slice(7).trim();
   }
-  return request.headers.get("x-api-key")?.trim() || new URL(request.url).searchParams.get("api_key")?.trim() || "";
+  return (
+    request.headers.get("x-api-key")?.trim() ||
+    new URL(request.url).searchParams.get("api_key")?.trim() ||
+    ""
+  );
 }
 
 export async function GET(request: Request, { params }: Params) {
@@ -26,7 +29,6 @@ export async function GET(request: Request, { params }: Params) {
 
   const doc = trip.documents.find((item) => item.id === docId);
   if (!doc) {
-    // Don't leak existence of other trips' docs
     const all = await listTrips();
     const belongsElsewhere = all.some((t) => t.documents.some((d) => d.id === docId));
     if (belongsElsewhere) {
@@ -35,8 +37,9 @@ export async function GET(request: Request, { params }: Params) {
     return NextResponse.json({ error: "Document not found" }, { status: 404 });
   }
 
-  const filePath = getUploadPath(trip.id, doc.storedName);
-  const data = await fs.readFile(filePath);
+  const data = await getDocumentBytes(trip.id, doc.storedName);
+  if (!data) return NextResponse.json({ error: "File missing in storage" }, { status: 404 });
+
   return new NextResponse(new Uint8Array(data), {
     headers: {
       "Content-Type": doc.mimeType,

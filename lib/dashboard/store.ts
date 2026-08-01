@@ -1,32 +1,27 @@
-import { promises as fs } from "fs";
-import path from "path";
 import { randomBytes } from "crypto";
 import type { DashboardData, DocumentType, Trip, TripDocument, TripStatus } from "./types";
-
-const DATA_DIR = path.join(process.cwd(), "data");
-const DB_FILE = path.join(DATA_DIR, "dashboard.json");
-const UPLOADS_DIR = path.join(DATA_DIR, "uploads");
-
-async function ensureStore() {
-  await fs.mkdir(DATA_DIR, { recursive: true });
-  await fs.mkdir(UPLOADS_DIR, { recursive: true });
-  try {
-    await fs.access(DB_FILE);
-  } catch {
-    const initial: DashboardData = { trips: [] };
-    await fs.writeFile(DB_FILE, JSON.stringify(initial, null, 2), "utf8");
-  }
-}
+import {
+  META_KEY,
+  deleteObject,
+  deletePrefix,
+  getObjectBuffer,
+  getObjectText,
+  objectKeyForDocument,
+  putObject,
+} from "./minio";
 
 async function readData(): Promise<DashboardData> {
-  await ensureStore();
-  const raw = await fs.readFile(DB_FILE, "utf8");
+  const raw = await getObjectText(META_KEY);
+  if (!raw) {
+    const initial: DashboardData = { trips: [] };
+    await writeData(initial);
+    return initial;
+  }
   return JSON.parse(raw) as DashboardData;
 }
 
 async function writeData(data: DashboardData) {
-  await ensureStore();
-  await fs.writeFile(DB_FILE, JSON.stringify(data, null, 2), "utf8");
+  await putObject(META_KEY, JSON.stringify(data, null, 2), "application/json");
 }
 
 function nowIso() {
@@ -94,7 +89,6 @@ export async function createTrip(input: CreateTripInput) {
   };
   data.trips.push(trip);
   await writeData(data);
-  await fs.mkdir(path.join(UPLOADS_DIR, trip.id), { recursive: true });
   return trip;
 }
 
@@ -130,7 +124,7 @@ export async function deleteTrip(id: string) {
   if (!trip) return false;
   data.trips = data.trips.filter((item) => item.id !== id);
   await writeData(data);
-  await fs.rm(path.join(UPLOADS_DIR, id), { recursive: true, force: true });
+  await deletePrefix(`uploads/${id}/`);
   return true;
 }
 
@@ -152,9 +146,12 @@ export async function addDocument(
     /[^a-zA-Z0-9._-]/g,
     "_"
   )}`;
-  const tripDir = path.join(UPLOADS_DIR, tripId);
-  await fs.mkdir(tripDir, { recursive: true });
-  await fs.writeFile(path.join(tripDir, storedName), input.buffer);
+
+  await putObject(
+    objectKeyForDocument(tripId, storedName),
+    input.buffer,
+    input.mimeType || "application/octet-stream"
+  );
 
   const doc: TripDocument = {
     id: newId("doc"),
@@ -184,7 +181,7 @@ export async function removeDocument(tripId: string, documentId: string) {
   trip.documents = trip.documents.filter((item) => item.id !== documentId);
   trip.updatedAt = nowIso();
   await writeData(data);
-  await fs.rm(path.join(UPLOADS_DIR, tripId, doc.storedName), { force: true });
+  await deleteObject(objectKeyForDocument(tripId, doc.storedName));
   return true;
 }
 
@@ -212,8 +209,8 @@ export async function revokeApiKey(tripId: string) {
   return trip;
 }
 
-export function getUploadPath(tripId: string, storedName: string) {
-  return path.join(UPLOADS_DIR, tripId, storedName);
+export async function getDocumentBytes(tripId: string, storedName: string) {
+  return getObjectBuffer(objectKeyForDocument(tripId, storedName));
 }
 
 export function toPublicTrip(trip: Trip, options?: { includeApiKey?: boolean }) {

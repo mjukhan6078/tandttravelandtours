@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
-import { promises as fs } from "fs";
-import { getTrip, getUploadPath, removeDocument } from "@/lib/dashboard/store";
+import { getDocumentBytes, getTrip, removeDocument } from "@/lib/dashboard/store";
 
 type Params = { params: Promise<{ id: string; docId: string }> };
 
@@ -12,8 +11,9 @@ export async function GET(_request: Request, { params }: Params) {
   const doc = trip.documents.find((item) => item.id === docId);
   if (!doc) return NextResponse.json({ error: "Document not found" }, { status: 404 });
 
-  const filePath = getUploadPath(id, doc.storedName);
-  const data = await fs.readFile(filePath);
+  const data = await getDocumentBytes(id, doc.storedName);
+  if (!data) return NextResponse.json({ error: "File missing in storage" }, { status: 404 });
+
   return new NextResponse(new Uint8Array(data), {
     headers: {
       "Content-Type": doc.mimeType,

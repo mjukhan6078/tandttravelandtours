@@ -6,14 +6,21 @@ services:
     container_name: tandt-travel
     ports:
       - "3090:3000"
+      # MinIO console UI only (API stays internal on 127.0.0.1:9000)
+      - "9001:9001"
     environment:
       NODE_ENV: production
       PORT: 3000
       HOSTNAME: 0.0.0.0
       DASHBOARD_SESSION_TOKEN: tandt-admin-session-v1
+      MINIO_ENDPOINT: http://127.0.0.1:9000
+      MINIO_ACCESS_KEY: minioadmin
+      MINIO_SECRET_KEY: minioadmin
+      MINIO_BUCKET: tandt-travel
+      MINIO_REGION: us-east-1
     volumes:
-      - tandt_data:/app/data
+      - minio_data:/data
     restart: unless-stopped
 
 volumes:
-  tandt_data:
+  minio_data:
