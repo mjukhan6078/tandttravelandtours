@@ -30,16 +30,16 @@ export default function Header() {
       <div className="absolute inset-0 bg-gradient-to-r from-primary/5 via-transparent to-secondary/5 pointer-events-none" />
 
       <div className="container mx-auto px-4 relative z-10">
-        <div className="flex items-center justify-between h-20">
+        <div className="flex items-center justify-between h-14">
           <Link href="/#home" className="flex items-center space-x-2">
             <Image
               src="/images/logo.png"
               alt="T&T Travel and Tours"
               width={60}
               height={60}
-              className="object-contain h-auto"
+              className="object-contain h-18 w-18"
             />
-            <span className="text-2xl font-bold text-primary font-heading">T&T Travel</span>
+            <span className="text-xl font-bold text-primary font-heading">T&T Travel and Tours</span>
           </Link>
 
           <nav className="hidden md:flex items-center gap-3">

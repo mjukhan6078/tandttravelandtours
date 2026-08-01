@@ -286,7 +286,7 @@ Please share available options and a quote.`;
           </AnimatedSection>
 
           <AnimatedSection delay={0.2}>
-            <aside className="lg:sticky lg:top-36">
+            <aside className="lg:sticky lg:top-28">
               <Card className="border-secondary/30 bg-card shadow-lg overflow-hidden">
                 <div className="h-1.5 bg-gradient-to-r from-primary via-secondary to-primary" />
                 <CardHeader>
