@@ -1,5 +1,6 @@
 import { randomBytes } from "crypto";
 import type {
+  FlightSegment,
   FlightType,
   PaymentStatus,
   RoomOccupancy,
@@ -10,7 +11,7 @@ import type {
   TripVisa,
   VisaStatus,
 } from "./types";
-import { defaultPayment, defaultTicket, defaultVisa } from "./types";
+import { defaultFlightSegment, defaultPayment, defaultTicket, defaultVisa } from "./types";
 import { formatConnectingStay } from "./connecting";
 
 function newHotelId() {
@@ -25,10 +26,10 @@ function asBool(value: unknown) {
   return value === true || value === "true" || value === 1 || value === "1";
 }
 
-export function sanitizeTicket(input: unknown): TripTicket {
-  const base = defaultTicket();
+export function sanitizeFlightSegment(input: unknown): FlightSegment {
+  const base = defaultFlightSegment();
   if (!input || typeof input !== "object") return base;
-  const row = input as Partial<TripTicket>;
+  const row = input as Partial<FlightSegment>;
   const flightType: FlightType = row.flightType === "connecting" ? "connecting" : "direct";
   const connectingAirport =
     flightType === "connecting" ? asString(row.connectingAirport).toUpperCase() : "";
@@ -45,15 +46,46 @@ export function sanitizeTicket(input: unknown): TripTicket {
     flightNumber: asString(row.flightNumber),
     departureAirport: asString(row.departureAirport).toUpperCase(),
     arrivalAirport: asString(row.arrivalAirport).toUpperCase(),
-    takeoffAt: asString(row.takeoffAt),
-    ticketPrice: asString(row.ticketPrice),
-    currency: asString(row.currency) || "PKR",
-    luggageAllowance: asString(row.luggageAllowance),
-    mealIncluded: asBool(row.mealIncluded),
     flightType,
     connectingAirport,
     connectingDuration,
     connectingStay,
+  };
+}
+
+function legacySegmentFromFlat(row: Record<string, unknown>): FlightSegment {
+  return sanitizeFlightSegment({
+    airline: row.airline,
+    flightNumber: row.flightNumber,
+    departureAirport: row.departureAirport,
+    arrivalAirport: row.arrivalAirport,
+    flightType: row.flightType,
+    connectingAirport: row.connectingAirport,
+    connectingDuration: row.connectingDuration,
+    connectingStay: row.connectingStay,
+  });
+}
+
+export function sanitizeTicket(input: unknown): TripTicket {
+  const base = defaultTicket();
+  if (!input || typeof input !== "object") return base;
+  const row = input as Partial<TripTicket> & Record<string, unknown>;
+
+  const hasSegments = row.departure != null || row.arrival != null;
+  const departure = hasSegments
+    ? sanitizeFlightSegment(row.departure)
+    : legacySegmentFromFlat(row);
+  const arrival = hasSegments
+    ? sanitizeFlightSegment(row.arrival)
+    : defaultFlightSegment();
+
+  return {
+    departure,
+    arrival,
+    ticketPrice: asString(row.ticketPrice),
+    currency: asString(row.currency) || "PKR",
+    luggageAllowance: asString(row.luggageAllowance),
+    mealIncluded: asBool(row.mealIncluded),
     notes: asString(row.notes),
   };
 }

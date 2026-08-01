@@ -24,23 +24,30 @@ export interface TripStay {
   nights: number;
 }
 
-export interface TripTicket {
+/** One flight direction (departure outbound or arrival/return). */
+export interface FlightSegment {
   airline: string;
   flightNumber: string;
   departureAirport: string;
   arrivalAirport: string;
-  takeoffAt: string;
+  flightType: FlightType;
+  /** Connecting airport IATA code when flight is connecting */
+  connectingAirport: string;
+  /** Layover duration in hours, e.g. "4h" */
+  connectingDuration: string;
+  /** Summary: via {airport} · {duration} */
+  connectingStay: string;
+}
+
+export interface TripTicket {
+  /** Outbound / going flight */
+  departure: FlightSegment;
+  /** Return / coming-back flight (can differ from departure) */
+  arrival: FlightSegment;
   ticketPrice: string;
   currency: string;
   luggageAllowance: string;
   mealIncluded: boolean;
-  flightType: FlightType;
-  /** Connecting airport IATA code when flight is connecting */
-  connectingAirport: string;
-  /** Layover duration, e.g. "4h 30m" */
-  connectingDuration: string;
-  /** Summary kept for compatibility / display: via {airport} · {duration} */
-  connectingStay: string;
   notes: string;
 }
 
@@ -174,21 +181,27 @@ export function defaultItinerary(): TripStay[] {
   ];
 }
 
-export function defaultTicket(): TripTicket {
+export function defaultFlightSegment(): FlightSegment {
   return {
     airline: "",
     flightNumber: "",
     departureAirport: "",
     arrivalAirport: "",
-    takeoffAt: "",
-    ticketPrice: "",
-    currency: "PKR",
-    luggageAllowance: "",
-    mealIncluded: false,
     flightType: "direct",
     connectingAirport: "",
     connectingDuration: "",
     connectingStay: "",
+  };
+}
+
+export function defaultTicket(): TripTicket {
+  return {
+    departure: defaultFlightSegment(),
+    arrival: defaultFlightSegment(),
+    ticketPrice: "",
+    currency: "PKR",
+    luggageAllowance: "",
+    mealIncluded: false,
     notes: "",
   };
 }

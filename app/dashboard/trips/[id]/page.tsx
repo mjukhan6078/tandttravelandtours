@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import DashboardShell from "@/components/dashboard/DashboardShell";
-import AirportSelect from "@/components/dashboard/AirportSelect";
+import FlightSegmentEditor from "@/components/dashboard/FlightSegmentEditor";
 import HotelsEditor from "@/components/dashboard/HotelsEditor";
 import ItineraryEditor, { ensureItinerary } from "@/components/dashboard/ItineraryEditor";
 import TripDocumentsPanel from "@/components/dashboard/TripDocumentsPanel";
@@ -29,15 +29,14 @@ import {
   nightsBetween,
 } from "@/lib/dashboard/duration";
 import {
-  FLIGHT_TYPE_LABELS,
   PAYMENT_STATUS_LABELS,
   TRIP_STATUS_LABELS,
   VISA_STATUS_LABELS,
+  defaultFlightSegment,
   defaultPayment,
   defaultTicket,
   defaultVisa,
   type DocumentType,
-  type FlightType,
   type PaymentStatus,
   type TripHotel,
   type TripPayment,
@@ -47,12 +46,6 @@ import {
   type TripVisa,
   type VisaStatus,
 } from "@/lib/dashboard/types";
-import { AIRLINE_OPTIONS, airlineLabel } from "@/lib/airlines";
-import {
-  formatConnectingDuration,
-  formatConnectingStay,
-  parseConnectingDuration,
-} from "@/lib/dashboard/connecting";
 import { Copy, KeyRound } from "lucide-react";
 
 type TripDoc = {
@@ -124,7 +117,22 @@ export default function TripDetailPage() {
     setItinerary(ensureItinerary(data.itinerary));
     setStartDate(data.startDate || "");
     setEndDate(data.endDate || "");
-    setTicket({ ...defaultTicket(), ...(data.ticket || {}) });
+    {
+      const base = defaultTicket();
+      const incoming = data.ticket;
+      setTicket({
+        ...base,
+        ...(incoming || {}),
+        departure: {
+          ...defaultFlightSegment(),
+          ...(incoming?.departure || {}),
+        },
+        arrival: {
+          ...defaultFlightSegment(),
+          ...(incoming?.arrival || {}),
+        },
+      });
+    }
     setVisa({ ...defaultVisa(), ...(data.visa || {}) });
     setHotels(Array.isArray(data.hotels) ? data.hotels : []);
     setPayment({ ...defaultPayment(), ...(data.payment || {}) });
@@ -449,85 +457,21 @@ export default function TripDetailPage() {
                 <CardTitle>Ticket</CardTitle>
               </CardHeader>
               <CardContent className="space-y-6">
-                <div className="grid sm:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label>Airline</Label>
-                    <Select
-                      value={ticket.airline || undefined}
-                      onValueChange={(airline) => setTicket({ ...ticket, airline })}
-                    >
-                      <SelectTrigger className="w-full">
-                        <SelectValue placeholder="Select airline" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {ticket.airline &&
-                          !AIRLINE_OPTIONS.some((option) => option.value === ticket.airline) && (
-                            <SelectItem value={ticket.airline}>
-                              {airlineLabel(ticket.airline)}
-                            </SelectItem>
-                          )}
-                        {AIRLINE_OPTIONS.map((option) => (
-                          <SelectItem key={option.value} value={option.value}>
-                            {option.label}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Flight number</Label>
-                    <Input
-                      value={ticket.flightNumber}
-                      onChange={(e) => setTicket({ ...ticket, flightNumber: e.target.value })}
-                      placeholder="e.g. SV 724"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Departure airport</Label>
-                    <AirportSelect
-                      value={ticket.departureAirport}
-                      onChange={(departureAirport) =>
-                        setTicket({ ...ticket, departureAirport })
-                      }
-                      placeholder="Select departure airport"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Arrival airport</Label>
-                    <AirportSelect
-                      value={ticket.arrivalAirport}
-                      onChange={(arrivalAirport) => setTicket({ ...ticket, arrivalAirport })}
-                      placeholder="Select arrival airport"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Take off</Label>
-                    <Input
-                      type="datetime-local"
-                      value={ticket.takeoffAt}
-                      onChange={(e) => setTicket({ ...ticket, takeoffAt: e.target.value })}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Flight type</Label>
-                    <Select
-                      value={ticket.flightType}
-                      onValueChange={(v) =>
-                        setTicket({ ...ticket, flightType: v as FlightType })
-                      }
-                    >
-                      <SelectTrigger className="w-full">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {Object.entries(FLIGHT_TYPE_LABELS).map(([value, label]) => (
-                          <SelectItem key={value} value={value}>
-                            {label}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
+                <FlightSegmentEditor
+                  title="Departure flight"
+                  hint="Outbound flight going to Saudi Arabia."
+                  value={ticket.departure}
+                  onChange={(departure) => setTicket({ ...ticket, departure })}
+                />
+
+                <FlightSegmentEditor
+                  title="Arrival flight"
+                  hint="Return flight coming back — can differ from departure."
+                  value={ticket.arrival}
+                  onChange={(arrival) => setTicket({ ...ticket, arrival })}
+                />
+
+                <div className="grid sm:grid-cols-2 gap-4 rounded-lg border border-border p-4">
                   <div className="space-y-2">
                     <Label>Ticket price</Label>
                     <Input
@@ -560,94 +504,6 @@ export default function TripDetailPage() {
                       }
                     />
                   </label>
-                  {ticket.flightType === "connecting" && (
-                    <>
-                      <div className="space-y-2">
-                        <Label>Via (connecting airport)</Label>
-                        <AirportSelect
-                          value={ticket.connectingAirport || ""}
-                          onChange={(connectingAirport) => {
-                            const connectingDuration = ticket.connectingDuration || "";
-                            setTicket({
-                              ...ticket,
-                              connectingAirport,
-                              connectingStay: formatConnectingStay(
-                                connectingAirport,
-                                connectingDuration
-                              ),
-                            });
-                          }}
-                          placeholder="Select connecting airport"
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label>Connecting duration</Label>
-                        <div className="grid grid-cols-2 gap-2">
-                          <div className="space-y-1">
-                            <Input
-                              type="number"
-                              min={0}
-                              max={72}
-                              value={parseConnectingDuration(ticket.connectingDuration).hours}
-                              onChange={(e) => {
-                                const hours = Math.max(0, Math.min(72, Number(e.target.value) || 0));
-                                const minutes = parseConnectingDuration(
-                                  ticket.connectingDuration
-                                ).minutes;
-                                const connectingDuration = formatConnectingDuration(hours, minutes);
-                                setTicket({
-                                  ...ticket,
-                                  connectingDuration,
-                                  connectingStay: formatConnectingStay(
-                                    ticket.connectingAirport || "",
-                                    connectingDuration
-                                  ),
-                                });
-                              }}
-                              placeholder="Hours"
-                            />
-                            <p className="text-[11px] text-muted-foreground">Hours</p>
-                          </div>
-                          <div className="space-y-1">
-                            <Input
-                              type="number"
-                              min={0}
-                              max={59}
-                              value={parseConnectingDuration(ticket.connectingDuration).minutes}
-                              onChange={(e) => {
-                                const minutes = Math.max(
-                                  0,
-                                  Math.min(59, Number(e.target.value) || 0)
-                                );
-                                const hours = parseConnectingDuration(
-                                  ticket.connectingDuration
-                                ).hours;
-                                const connectingDuration = formatConnectingDuration(hours, minutes);
-                                setTicket({
-                                  ...ticket,
-                                  connectingDuration,
-                                  connectingStay: formatConnectingStay(
-                                    ticket.connectingAirport || "",
-                                    connectingDuration
-                                  ),
-                                });
-                              }}
-                              placeholder="Minutes"
-                            />
-                            <p className="text-[11px] text-muted-foreground">Minutes</p>
-                          </div>
-                        </div>
-                      </div>
-                      {(ticket.connectingAirport || ticket.connectingDuration) && (
-                        <p className="sm:col-span-2 text-sm text-muted-foreground rounded-md border border-border bg-muted/30 px-3 py-2">
-                          {formatConnectingStay(
-                            ticket.connectingAirport || "",
-                            ticket.connectingDuration || ""
-                          )}
-                        </p>
-                      )}
-                    </>
-                  )}
                   <div className="space-y-2 sm:col-span-2">
                     <Label>Ticket notes</Label>
                     <Textarea
