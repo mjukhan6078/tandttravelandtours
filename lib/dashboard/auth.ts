@@ -27,20 +27,23 @@ export async function isAuthenticated() {
   return verifySessionToken(jar.get(SESSION_COOKIE)?.value);
 }
 
-export function sessionCookieOptions(request?: Request, maxAge = 60 * 60 * 24 * 7) {
-  const forwardedProto = request?.headers.get("x-forwarded-proto")?.split(",")[0]?.trim();
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL || "";
-  const forceSecure = process.env.COOKIE_SECURE === "true";
-  const forceInsecure = process.env.COOKIE_SECURE === "false";
-
-  let secure = false;
-  if (forceInsecure) {
-    secure = false;
-  } else if (forceSecure) {
-    secure = true;
-  } else if (forwardedProto === "https" || appUrl.startsWith("https://")) {
-    secure = true;
+function requestIsHttps(request?: Request) {
+  if (!request) return false;
+  const forwarded = request.headers.get("x-forwarded-proto")?.split(",")[0]?.trim();
+  if (forwarded === "https") return true;
+  if (forwarded === "http") return false;
+  try {
+    return new URL(request.url).protocol === "https:";
+  } catch {
+    return false;
   }
+}
+
+export function sessionCookieOptions(request?: Request, maxAge = 60 * 60 * 24 * 7) {
+  // Always follow the real request protocol so http://IP:3090 login works,
+  // while https://domain (NPM) still gets Secure cookies.
+  const secure =
+    process.env.COOKIE_SECURE === "false" ? false : requestIsHttps(request);
 
   return {
     httpOnly: true,

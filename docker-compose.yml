@@ -14,8 +14,8 @@ services:
       HOSTNAME: 0.0.0.0
       # Public site URL (your NPM / DNS domain), e.g. https://travel.example.com
       NEXT_PUBLIC_APP_URL: ${NEXT_PUBLIC_APP_URL:-https://www.tandttravelandtours.com}
-      # true for HTTPS (NPM SSL). false only if you use plain http://IP:3090
-      COOKIE_SECURE: ${COOKIE_SECURE:-true}
+      # Optional override. Leave unset to auto-detect from request (http vs https).
+      COOKIE_SECURE: ${COOKIE_SECURE:-}
       DASHBOARD_USER: ${DASHBOARD_USER:-admin}
       DASHBOARD_PASS: ${DASHBOARD_PASS:-admin}
       MINIO_ENDPOINT: http://127.0.0.1:9000
