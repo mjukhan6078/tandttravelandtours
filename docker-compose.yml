@@ -13,8 +13,11 @@ services:
       PORT: 3000
       HOSTNAME: 0.0.0.0
       # Public site URL (your NPM / DNS domain), e.g. https://travel.example.com
-      NEXT_PUBLIC_APP_URL: ${NEXT_PUBLIC_APP_URL:-http://localhost:3090}
-      DASHBOARD_SESSION_TOKEN: tandt-admin-session-v1
+      NEXT_PUBLIC_APP_URL: ${NEXT_PUBLIC_APP_URL:-https://www.tandttravelandtours.com}
+      # true for HTTPS (NPM SSL). false only if you use plain http://IP:3090
+      COOKIE_SECURE: ${COOKIE_SECURE:-true}
+      DASHBOARD_USER: ${DASHBOARD_USER:-admin}
+      DASHBOARD_PASS: ${DASHBOARD_PASS:-admin}
       MINIO_ENDPOINT: http://127.0.0.1:9000
       MINIO_ROOT_USER: admin
       MINIO_ROOT_PASSWORD: Junaid6078

@@ -1,15 +1,13 @@
 "use client";
 
-import { FormEvent, useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { FormEvent, useState, Suspense } from "react";
+import { useSearchParams } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Suspense } from "react";
 
 function LoginForm() {
-  const router = useRouter();
   const searchParams = useSearchParams();
   const [username, setUsername] = useState("admin");
   const [password, setPassword] = useState("");
@@ -23,18 +21,23 @@ function LoginForm() {
     const response = await fetch("/api/dashboard/login", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ username, password }),
+      credentials: "same-origin",
+      body: JSON.stringify({
+        username: username.trim(),
+        password,
+      }),
     });
-    setLoading(false);
 
     if (!response.ok) {
       const data = await response.json().catch(() => ({}));
+      setLoading(false);
       setError(data.error || "Login failed");
       return;
     }
 
-    router.push(searchParams.get("next") || "/dashboard");
-    router.refresh();
+    // Full navigation so the session cookie is always applied
+    const next = searchParams.get("next") || "/dashboard";
+    window.location.assign(next);
   };
 
   return (
