@@ -1,0 +1,13 @@
+services:
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: tandt-travel
+    ports:
+      - "3090:3000"
+    environment:
+      NODE_ENV: production
+      PORT: 3090
+      HOSTNAME: 192.168.100.184
+    restart: unless-stopped
