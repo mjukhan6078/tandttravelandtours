@@ -167,40 +167,38 @@ export default function FlightSegmentEditor({
               onChange={(connectingAirport) => patch({ connectingAirport })}
               placeholder="Connecting airport"
             />
-            <div className="grid grid-cols-[1fr_auto_1fr] gap-2 items-end">
-              <div className="space-y-1 min-w-0">
-                <p className="text-[11px] text-muted-foreground">Arrive</p>
-                <Input
-                  type="time"
-                  value={value.connectingArrivalTime || ""}
-                  onChange={(e) => updateViaArrival(e.target.value)}
-                  aria-label="Arrival time at connecting airport"
-                />
-              </div>
-              <div className="space-y-1 w-[72px]">
-                <p className="text-[11px] text-muted-foreground">Stay</p>
-                <Input
-                  type="number"
-                  min={0}
-                  max={72}
-                  value={parseConnectingDuration(value.connectingDuration).hours || ""}
-                  onChange={(e) => {
-                    const hours = Math.max(0, Math.min(72, Number(e.target.value) || 0));
-                    updateViaDuration(hours);
-                  }}
-                  placeholder="h"
-                  aria-label="Connecting stay duration hours"
-                />
-              </div>
-              <div className="space-y-1 min-w-0">
-                <p className="text-[11px] text-muted-foreground">Depart</p>
-                <Input
-                  type="time"
-                  value={value.connectingDepartureTime || ""}
-                  onChange={(e) => updateViaDeparture(e.target.value)}
-                  aria-label="Departure time from connecting airport"
-                />
-              </div>
+            <div className="grid grid-cols-[1fr_auto_1fr] gap-2 items-center">
+              <Input
+                type="time"
+                value={value.connectingArrivalTime || ""}
+                onChange={(e) => updateViaArrival(e.target.value)}
+                aria-label="Arrival time at connecting airport"
+              />
+              <Select
+                value={
+                  parseConnectingDuration(value.connectingDuration).hours > 0
+                    ? String(parseConnectingDuration(value.connectingDuration).hours)
+                    : undefined
+                }
+                onValueChange={(v) => updateViaDuration(Number(v))}
+              >
+                <SelectTrigger className="w-[88px]" aria-label="Connecting stay duration hours">
+                  <SelectValue placeholder="Hours" />
+                </SelectTrigger>
+                <SelectContent>
+                  {Array.from({ length: 24 }, (_, i) => i + 1).map((hours) => (
+                    <SelectItem key={hours} value={String(hours)}>
+                      {hours}h
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Input
+                type="time"
+                value={value.connectingDepartureTime || ""}
+                onChange={(e) => updateViaDeparture(e.target.value)}
+                aria-label="Departure time from connecting airport"
+              />
             </div>
           </div>
         )}
