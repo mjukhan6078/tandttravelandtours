@@ -37,10 +37,12 @@ export interface FlightSegment {
   flightType: FlightType;
   /** Connecting airport IATA code when flight is connecting */
   connectingAirport: string;
-  /** Local via / connection time HH:mm */
-  connectingTime: string;
+  /** Arrival time at connecting airport HH:mm */
+  connectingArrivalTime: string;
   /** Layover duration in hours, e.g. "4h" */
   connectingDuration: string;
+  /** Departure time from connecting airport HH:mm (auto from arrival + duration) */
+  connectingDepartureTime: string;
   /** Summary: via {airport} · {duration} */
   connectingStay: string;
 }
@@ -197,8 +199,9 @@ export function defaultFlightSegment(): FlightSegment {
     arrivalTime: "",
     flightType: "direct",
     connectingAirport: "",
-    connectingTime: "",
+    connectingArrivalTime: "",
     connectingDuration: "",
+    connectingDepartureTime: "",
     connectingStay: "",
   };
 }

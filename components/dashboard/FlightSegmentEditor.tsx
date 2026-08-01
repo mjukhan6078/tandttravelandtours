@@ -12,8 +12,10 @@ import {
 } from "@/components/ui/select";
 import { AIRLINE_OPTIONS, airlineLabel } from "@/lib/airlines";
 import {
+  addHoursToTime,
   formatConnectingDuration,
   formatConnectingStay,
+  hoursBetweenTimes,
   parseConnectingDuration,
 } from "@/lib/dashboard/connecting";
 import {
@@ -42,17 +44,46 @@ export default function FlightSegmentEditor({
       );
     } else {
       next.connectingAirport = "";
-      next.connectingTime = "";
+      next.connectingArrivalTime = "";
       next.connectingDuration = "";
+      next.connectingDepartureTime = "";
       next.connectingStay = "";
     }
     onChange(next);
   };
 
+  const updateViaArrival = (connectingArrivalTime: string) => {
+    const hours = parseConnectingDuration(value.connectingDuration).hours;
+    const connectingDepartureTime =
+      connectingArrivalTime && hours > 0
+        ? addHoursToTime(connectingArrivalTime, hours)
+        : value.connectingDepartureTime;
+    patch({ connectingArrivalTime, connectingDepartureTime });
+  };
+
+  const updateViaDuration = (hours: number) => {
+    const connectingDuration = formatConnectingDuration(hours);
+    const connectingDepartureTime =
+      value.connectingArrivalTime && hours > 0
+        ? addHoursToTime(value.connectingArrivalTime, hours)
+        : "";
+    patch({ connectingDuration, connectingDepartureTime });
+  };
+
+  const updateViaDeparture = (connectingDepartureTime: string) => {
+    if (value.connectingArrivalTime && connectingDepartureTime) {
+      const hours = hoursBetweenTimes(value.connectingArrivalTime, connectingDepartureTime);
+      patch({
+        connectingDepartureTime,
+        connectingDuration: formatConnectingDuration(hours),
+      });
+      return;
+    }
+    patch({ connectingDepartureTime });
+  };
+
   const routeCols =
-    value.flightType === "connecting"
-      ? "sm:grid-cols-[1.2fr_1.2fr_90px_1.2fr]"
-      : "sm:grid-cols-2";
+    value.flightType === "connecting" ? "sm:grid-cols-[1fr_1.6fr_1fr]" : "sm:grid-cols-2";
 
   return (
     <div className="space-y-4 rounded-lg border border-border bg-muted/20 p-4">
@@ -129,36 +160,49 @@ export default function FlightSegmentEditor({
         </div>
 
         {value.flightType === "connecting" && (
-          <>
-            <div className="space-y-2 min-w-0">
-              <Label>Via</Label>
-              <AirportSelect
-                value={value.connectingAirport || ""}
-                onChange={(connectingAirport) => patch({ connectingAirport })}
-                placeholder="Connecting airport"
-              />
-              <Input
-                type="time"
-                value={value.connectingTime || ""}
-                onChange={(e) => patch({ connectingTime: e.target.value })}
-                aria-label="Via time"
-              />
+          <div className="space-y-2 min-w-0">
+            <Label>Via</Label>
+            <AirportSelect
+              value={value.connectingAirport || ""}
+              onChange={(connectingAirport) => patch({ connectingAirport })}
+              placeholder="Connecting airport"
+            />
+            <div className="grid grid-cols-[1fr_auto_1fr] gap-2 items-end">
+              <div className="space-y-1 min-w-0">
+                <p className="text-[11px] text-muted-foreground">Arrive</p>
+                <Input
+                  type="time"
+                  value={value.connectingArrivalTime || ""}
+                  onChange={(e) => updateViaArrival(e.target.value)}
+                  aria-label="Arrival time at connecting airport"
+                />
+              </div>
+              <div className="space-y-1 w-[72px]">
+                <p className="text-[11px] text-muted-foreground">Stay</p>
+                <Input
+                  type="number"
+                  min={0}
+                  max={72}
+                  value={parseConnectingDuration(value.connectingDuration).hours || ""}
+                  onChange={(e) => {
+                    const hours = Math.max(0, Math.min(72, Number(e.target.value) || 0));
+                    updateViaDuration(hours);
+                  }}
+                  placeholder="h"
+                  aria-label="Connecting stay duration hours"
+                />
+              </div>
+              <div className="space-y-1 min-w-0">
+                <p className="text-[11px] text-muted-foreground">Depart</p>
+                <Input
+                  type="time"
+                  value={value.connectingDepartureTime || ""}
+                  onChange={(e) => updateViaDeparture(e.target.value)}
+                  aria-label="Departure time from connecting airport"
+                />
+              </div>
             </div>
-            <div className="space-y-2">
-              <Label>Duration</Label>
-              <Input
-                type="number"
-                min={0}
-                max={72}
-                value={parseConnectingDuration(value.connectingDuration).hours || ""}
-                onChange={(e) => {
-                  const hours = Math.max(0, Math.min(72, Number(e.target.value) || 0));
-                  patch({ connectingDuration: formatConnectingDuration(hours) });
-                }}
-                placeholder="Hours"
-              />
-            </div>
-          </>
+          </div>
         )}
 
         <div className="space-y-2 min-w-0">
@@ -179,8 +223,13 @@ export default function FlightSegmentEditor({
 
       {value.flightType === "connecting" && value.connectingStay && (
         <p className="text-sm text-muted-foreground rounded-md border border-border bg-background px-3 py-2">
-          {value.departureAirport || "—"} → {value.connectingStay} →{" "}
-          {value.arrivalAirport || "—"}
+          {value.departureAirport || "—"}
+          {value.departureTime ? ` ${value.departureTime}` : ""} → {value.connectingStay}
+          {value.connectingArrivalTime || value.connectingDepartureTime
+            ? ` (${value.connectingArrivalTime || "—"} → ${value.connectingDepartureTime || "—"})`
+            : ""}{" "}
+          → {value.arrivalAirport || "—"}
+          {value.arrivalTime ? ` ${value.arrivalTime}` : ""}
         </p>
       )}
     </div>
