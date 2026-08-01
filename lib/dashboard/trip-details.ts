@@ -61,6 +61,8 @@ export function sanitizeFlightSegment(input: unknown): FlightSegment {
     connectingDepartureTime,
     connectingStay,
     ticketPrice: asString(row.ticketPrice),
+    luggageAllowance: asString(row.luggageAllowance),
+    mealIncluded: asBool(row.mealIncluded),
   };
 }
 
@@ -75,6 +77,8 @@ function legacySegmentFromFlat(row: Record<string, unknown>): FlightSegment {
     connectingDuration: row.connectingDuration,
     connectingStay: row.connectingStay,
     ticketPrice: row.ticketPrice,
+    luggageAllowance: row.luggageAllowance,
+    mealIncluded: row.mealIncluded,
   });
 }
 
@@ -97,12 +101,27 @@ export function sanitizeTicket(input: unknown): TripTicket {
     departure = { ...departure, ticketPrice: legacyPrice };
   }
 
+  // Migrate old shared luggage/meal onto both segments when missing
+  const legacyLuggage = asString(row.luggageAllowance);
+  if (legacyLuggage) {
+    if (!departure.luggageAllowance) {
+      departure = { ...departure, luggageAllowance: legacyLuggage };
+    }
+    if (!arrival.luggageAllowance) {
+      arrival = { ...arrival, luggageAllowance: legacyLuggage };
+    }
+  }
+  if (row.mealIncluded !== undefined) {
+    const legacyMeal = asBool(row.mealIncluded);
+    if (!hasSegments) {
+      departure = { ...departure, mealIncluded: legacyMeal };
+    }
+  }
+
   return {
     departure,
     arrival,
     currency: asString(row.currency) || "PKR",
-    luggageAllowance: asString(row.luggageAllowance),
-    mealIncluded: asBool(row.mealIncluded),
     notes: asString(row.notes),
   };
 }

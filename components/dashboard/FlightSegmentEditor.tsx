@@ -3,6 +3,7 @@
 import AirportSelect from "@/components/dashboard/AirportSelect";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
 import {
   Select,
   SelectContent,
@@ -123,21 +124,13 @@ export default function FlightSegmentEditor({
             placeholder="e.g. SV 724"
           />
         </div>
-        <div className="space-y-2">
-          <Label>Ticket price</Label>
-          <Input
-            value={value.ticketPrice}
-            onChange={(e) => patch({ ticketPrice: e.target.value })}
-            placeholder="e.g. 95000"
-          />
-        </div>
-        <div className="space-y-2">
+        <div className="space-y-2 sm:col-span-2">
           <Label>Flight type</Label>
           <Select
             value={value.flightType}
             onValueChange={(flightType) => patch({ flightType: flightType as FlightType })}
           >
-            <SelectTrigger className="w-full">
+            <SelectTrigger className="w-full sm:max-w-xs">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -238,6 +231,24 @@ export default function FlightSegmentEditor({
           {value.arrivalTime ? ` ${value.arrivalTime}` : ""}
         </p>
       )}
+
+      <div className="grid sm:grid-cols-2 gap-4">
+        <div className="space-y-2 sm:col-span-2">
+          <Label>Luggage allowance</Label>
+          <Input
+            value={value.luggageAllowance}
+            onChange={(e) => patch({ luggageAllowance: e.target.value })}
+            placeholder="e.g. 2 × 23kg + 7kg cabin"
+          />
+        </div>
+        <label className="flex items-center justify-between gap-3 rounded-md border border-border bg-background px-3 py-2 sm:col-span-2">
+          <span className="text-sm">Meal included</span>
+          <Switch
+            checked={value.mealIncluded}
+            onCheckedChange={(checked) => patch({ mealIncluded: checked })}
+          />
+        </label>
+      </div>
     </div>
   );
 }

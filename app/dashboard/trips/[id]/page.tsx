@@ -473,6 +473,32 @@ export default function TripDetailPage() {
 
                 <div className="grid sm:grid-cols-2 gap-4 rounded-lg border border-border p-4">
                   <div className="space-y-2">
+                    <Label>Departure flight price</Label>
+                    <Input
+                      value={ticket.departure.ticketPrice}
+                      onChange={(e) =>
+                        setTicket({
+                          ...ticket,
+                          departure: { ...ticket.departure, ticketPrice: e.target.value },
+                        })
+                      }
+                      placeholder="e.g. 95000"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Return flight price</Label>
+                    <Input
+                      value={ticket.arrival.ticketPrice}
+                      onChange={(e) =>
+                        setTicket({
+                          ...ticket,
+                          arrival: { ...ticket.arrival, ticketPrice: e.target.value },
+                        })
+                      }
+                      placeholder="e.g. 90000"
+                    />
+                  </div>
+                  <div className="space-y-2">
                     <Label>Currency</Label>
                     <Input
                       value={ticket.currency}
@@ -492,23 +518,6 @@ export default function TripDetailPage() {
                       placeholder="Auto from departure + return"
                     />
                   </div>
-                  <div className="space-y-2 sm:col-span-2">
-                    <Label>Luggage allowance</Label>
-                    <Input
-                      value={ticket.luggageAllowance}
-                      onChange={(e) => setTicket({ ...ticket, luggageAllowance: e.target.value })}
-                      placeholder="e.g. 2 × 23kg + 7kg cabin"
-                    />
-                  </div>
-                  <label className="flex items-center justify-between gap-3 rounded-md border border-border px-3 py-2 sm:col-span-2">
-                    <span className="text-sm">Meal included</span>
-                    <Switch
-                      checked={ticket.mealIncluded}
-                      onCheckedChange={(checked) =>
-                        setTicket({ ...ticket, mealIncluded: checked })
-                      }
-                    />
-                  </label>
                   <div className="space-y-2 sm:col-span-2">
                     <Label>Ticket notes</Label>
                     <Textarea
