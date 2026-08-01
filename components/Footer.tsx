@@ -3,6 +3,7 @@ import Link from "next/link";
 
 const WHATSAPP_URL = "https://wa.me/923002062324";
 const WHATSAPP_DISPLAY = "+92 300 2062324";
+const WHATSAPP_NAME = "Muhammad Irfanullah Khan";
 
 export default function Footer() {
   return (
@@ -54,6 +55,9 @@ export default function Footer() {
             <h4 className="text-sm font-semibold tracking-wide uppercase text-secondary mb-4">
               WhatsApp
             </h4>
+            <p className="text-sm font-medium text-primary-foreground/90 mb-1">
+              {WHATSAPP_NAME}
+            </p>
             <a
               href={WHATSAPP_URL}
               target="_blank"

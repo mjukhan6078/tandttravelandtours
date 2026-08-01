@@ -7,6 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 const WHATSAPP_NUMBER = "923002062324";
 const WHATSAPP_DISPLAY = "+92 300 2062324";
+const WHATSAPP_NAME = "Muhammad Irfanullah Khan";
 const WHATSAPP_URL = `https://wa.me/${WHATSAPP_NUMBER}`;
 
 export default function Contact() {
@@ -29,15 +30,17 @@ export default function Contact() {
                   <CardTitle>WhatsApp</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-2">
-                  <p className="text-muted-foreground">Message us directly on WhatsApp</p>
-                  <a
-                    href={WHATSAPP_URL}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="block text-xl font-semibold text-primary hover:text-primary/80 transition-colors"
-                  >
-                    {WHATSAPP_DISPLAY}
-                  </a>
+                  <div>
+                    <p className="text-base font-semibold text-foreground">{WHATSAPP_NAME}</p>
+                    <a
+                      href={WHATSAPP_URL}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="block text-xl font-semibold text-primary hover:text-primary/80 transition-colors"
+                    >
+                      {WHATSAPP_DISPLAY}
+                    </a>
+                  </div>
                   <Button
                     asChild
                     className="w-full bg-[#25D366] hover:bg-[#1ebe57] text-white"
