@@ -24,16 +24,32 @@ export interface TripStay {
   nights: number;
 }
 
+export interface TicketPassenger {
+  id: string;
+  name: string;
+  ticketNo: string;
+  passport: string;
+  passportExpiry: string;
+  nationality: string;
+}
+
 /** One flight direction (departure outbound or arrival/return). */
 export interface FlightSegment {
   airline: string;
+  /** Primary / first-leg flight number */
   flightNumber: string;
+  /** Second-leg flight number when connecting */
+  connectingFlightNumber: string;
+  /** Travel date YYYY-MM-DD */
+  flightDate: string;
   departureAirport: string;
   /** Local departure time HH:mm */
   departureTime: string;
+  departureTerminal: string;
   arrivalAirport: string;
   /** Local arrival time HH:mm */
   arrivalTime: string;
+  arrivalTerminal: string;
   flightType: FlightType;
   /** Connecting airport IATA code when flight is connecting */
   connectingAirport: string;
@@ -43,8 +59,12 @@ export interface FlightSegment {
   connectingDuration: string;
   /** Departure time from connecting airport HH:mm (auto from arrival + duration) */
   connectingDepartureTime: string;
+  connectingTerminal: string;
   /** Summary: via {airport} · {duration} */
   connectingStay: string;
+  bookingClass: string;
+  /** e.g. HK - Confirmed */
+  status: string;
   /** Price per single ticket for this flight */
   unitPrice: string;
   /** Currency for this flight price */
@@ -87,6 +107,16 @@ export interface TripTicket {
   departure: FlightSegment;
   /** Return / coming-back flight (can differ from departure) */
   arrival: FlightSegment;
+  /** Galileo / GDS booking reference */
+  pnr: string;
+  /** Airline booking reference */
+  airlinePnr: string;
+  issueDate: string;
+  issuingAgent: string;
+  iataNumber: string;
+  tourCode: string;
+  formOfPayment: string;
+  passengers: TicketPassenger[];
   /** Legacy / fallback currency */
   currency: string;
   notes: string;
@@ -226,16 +256,23 @@ export function defaultFlightSegment(): FlightSegment {
   return {
     airline: "",
     flightNumber: "",
+    connectingFlightNumber: "",
+    flightDate: "",
     departureAirport: "",
     departureTime: "",
+    departureTerminal: "",
     arrivalAirport: "",
     arrivalTime: "",
+    arrivalTerminal: "",
     flightType: "direct",
     connectingAirport: "",
     connectingArrivalTime: "",
     connectingDuration: "",
     connectingDepartureTime: "",
+    connectingTerminal: "",
     connectingStay: "",
+    bookingClass: "",
+    status: "",
     unitPrice: "",
     currency: "PKR",
     currencyOther: "",
@@ -246,10 +283,29 @@ export function defaultFlightSegment(): FlightSegment {
   };
 }
 
+export function defaultTicketPassenger(): TicketPassenger {
+  return {
+    id: `pax_${Math.random().toString(36).slice(2, 10)}`,
+    name: "",
+    ticketNo: "",
+    passport: "",
+    passportExpiry: "",
+    nationality: "",
+  };
+}
+
 export function defaultTicket(): TripTicket {
   return {
     departure: defaultFlightSegment(),
     arrival: defaultFlightSegment(),
+    pnr: "",
+    airlinePnr: "",
+    issueDate: "",
+    issuingAgent: "",
+    iataNumber: "",
+    tourCode: "",
+    formOfPayment: "",
+    passengers: [],
     currency: "PKR",
     notes: "",
   };

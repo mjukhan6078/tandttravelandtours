@@ -7,6 +7,7 @@ import DashboardShell from "@/components/dashboard/DashboardShell";
 import FlightSegmentEditor from "@/components/dashboard/FlightSegmentEditor";
 import HotelsEditor from "@/components/dashboard/HotelsEditor";
 import ItineraryEditor, { ensureItinerary } from "@/components/dashboard/ItineraryEditor";
+import TicketPassengersEditor from "@/components/dashboard/TicketPassengersEditor";
 import TripDocumentsPanel from "@/components/dashboard/TripDocumentsPanel";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -49,6 +50,7 @@ import {
   type FlightSegment,
   type PaymentStatus,
   type TicketCurrency,
+  type TicketPassenger,
   type TripHotel,
   type TripPayment,
   type TripStatus,
@@ -58,6 +60,31 @@ import {
   type VisaStatus,
 } from "@/lib/dashboard/types";
 import { Copy, FileUp, KeyRound } from "lucide-react";
+
+function normalizeTicketState(incoming?: TripTicket | null): TripTicket {
+  const base = defaultTicket();
+  const next = {
+    ...base,
+    ...(incoming || {}),
+    departure: syncSegmentTicketPrice({
+      ...defaultFlightSegment(),
+      ...(incoming?.departure || {}),
+    }),
+    arrival: syncSegmentTicketPrice({
+      ...defaultFlightSegment(),
+      ...(incoming?.arrival || {}),
+    }),
+    passengers: Array.isArray(incoming?.passengers) ? incoming.passengers : [],
+  };
+  if (next.passengers.length > 0) {
+    const units = next.passengers.length;
+    next.departure = syncSegmentTicketPrice({ ...next.departure, ticketUnits: units });
+    if (segmentHasFlightDetails(next.arrival)) {
+      next.arrival = syncSegmentTicketPrice({ ...next.arrival, ticketUnits: units });
+    }
+  }
+  return next;
+}
 
 type TripDoc = {
   id: string;
@@ -129,22 +156,7 @@ export default function TripDetailPage() {
     setItinerary(ensureItinerary(data.itinerary));
     setStartDate(data.startDate || "");
     setEndDate(data.endDate || "");
-    {
-      const base = defaultTicket();
-      const incoming = data.ticket;
-      setTicket({
-        ...base,
-        ...(incoming || {}),
-        departure: {
-          ...defaultFlightSegment(),
-          ...(incoming?.departure || {}),
-        },
-        arrival: {
-          ...defaultFlightSegment(),
-          ...(incoming?.arrival || {}),
-        },
-      });
-    }
+    setTicket(normalizeTicketState(data.ticket));
     setVisa({ ...defaultVisa(), ...(data.visa || {}) });
     setHotels(Array.isArray(data.hotels) ? data.hotels : []);
     setPayment({ ...defaultPayment(), ...(data.payment || {}) });
@@ -306,25 +318,37 @@ export default function TripDetailPage() {
       return;
     }
 
-    setTicket({
-      ...defaultTicket(),
-      ...parsedTicket,
-      departure: syncSegmentTicketPrice({
-        ...defaultFlightSegment(),
-        ...(parsedTicket.departure || {}),
-      }),
-      arrival: syncSegmentTicketPrice({
-        ...defaultFlightSegment(),
-        ...(parsedTicket.arrival || {}),
-      }),
-      notes: parsedTicket.notes || ticket.notes,
-    });
+    setTicket(
+      normalizeTicketState({
+        ...parsedTicket,
+        notes: parsedTicket.notes || ticket.notes,
+      })
+    );
 
     if (data.parsed?.clientNameHint && !clientName.trim()) {
       setClientName(data.parsed.clientNameHint);
     }
 
     setMessage(`Ticket details loaded: ${data.parsed?.summary || "OK"}`);
+  };
+
+  const updatePassengers = (passengers: TicketPassenger[]) => {
+    const units = Math.max(1, passengers.length || ticket.departure.ticketUnits || 1);
+    setTicket({
+      ...ticket,
+      passengers,
+      departure: syncSegmentTicketPrice({
+        ...ticket.departure,
+        ticketUnits: passengers.length > 0 ? units : ticket.departure.ticketUnits,
+      }),
+      arrival: syncSegmentTicketPrice({
+        ...ticket.arrival,
+        ticketUnits:
+          passengers.length > 0 && segmentHasFlightDetails(ticket.arrival)
+            ? units
+            : ticket.arrival.ticketUnits,
+      }),
+    });
   };
 
   if (loading) {
@@ -513,252 +537,340 @@ export default function TripDetailPage() {
               <CardHeader>
                 <CardTitle>Ticket</CardTitle>
               </CardHeader>
-              <CardContent className="space-y-6">
-                <div className="rounded-lg border border-dashed border-border bg-muted/20 p-4 space-y-3">
-                  <div className="flex flex-wrap items-start justify-between gap-3">
-                    <div>
-                      <p className="text-sm font-semibold flex items-center gap-2">
-                        <FileUp className="h-4 w-4 text-secondary" />
-                        Import ticket PDF
-                      </p>
-                      <p className="text-xs text-muted-foreground mt-1">
-                        Upload a Galileo e-ticket (e.g. H9429R x2 TKTS.pdf) to auto-fill
-                        departure/return flights, via times, luggage, and units.
-                      </p>
-                    </div>
-                    <Label
-                      htmlFor="ticket-pdf-upload"
-                      className={`inline-flex items-center justify-center rounded-md border border-border bg-background px-3 py-2 text-sm font-medium cursor-pointer hover:bg-muted ${
-                        parsingTicket ? "opacity-60 pointer-events-none" : ""
-                      }`}
-                    >
-                      {parsingTicket ? "Reading PDF…" : "Choose PDF"}
-                    </Label>
-                    <Input
-                      id="ticket-pdf-upload"
-                      type="file"
-                      accept="application/pdf,.pdf"
-                      className="hidden"
-                      disabled={parsingTicket}
-                      onChange={(e) => {
-                        const file = e.target.files?.[0] || null;
-                        void parseTicketPdf(file);
-                        e.currentTarget.value = "";
-                      }}
-                    />
-                  </div>
-                </div>
-
-                <FlightSegmentEditor
-                  title="Departure flight"
-                  hint="Outbound flight going to Saudi Arabia."
-                  value={ticket.departure}
-                  onChange={(departure) =>
-                    setTicket({
-                      ...ticket,
-                      departure: syncSegmentTicketPrice({
-                        ...departure,
-                        ticketUnits:
-                          departure.ticketUnits > 0
-                            ? departure.ticketUnits
-                            : segmentHasFlightDetails(departure)
-                              ? 1
-                              : 0,
-                      }),
-                    })
-                  }
-                />
-
-                <FlightSegmentEditor
-                  title="Arrival flight"
-                  hint="Return flight coming back — can differ from departure."
-                  value={ticket.arrival}
-                  onChange={(arrival) =>
-                    setTicket({
-                      ...ticket,
-                      arrival: syncSegmentTicketPrice({
-                        ...arrival,
-                        ticketUnits:
-                          arrival.ticketUnits > 0
-                            ? arrival.ticketUnits
-                            : segmentHasFlightDetails(arrival)
-                              ? 1
-                              : 0,
-                      }),
-                    })
-                  }
-                />
-
-                <div className="space-y-4 rounded-lg border border-border p-4">
+              <CardContent className="space-y-8">
+                <section className="space-y-3">
                   <div>
-                    <p className="text-sm font-semibold">Ticket pricing</p>
+                    <h3 className="text-sm font-semibold">1. Import</h3>
                     <p className="text-xs text-muted-foreground mt-1">
-                      Enter unit price and number of tickets for each flight. Totals update
-                      automatically.
+                      Upload a Galileo e-ticket PDF to auto-fill booking, passengers, and flights.
                     </p>
                   </div>
-
-                  {(
-                    [
-                      ["departure", "Departure flight"],
-                      ["arrival", "Return flight"],
-                    ] as const
-                  ).map(([key, label]) => {
-                    const segment = ticket[key];
-                    const ready = segmentHasFlightDetails(segment);
-                    const updateSegment = (partial: Partial<FlightSegment>) => {
-                      const next = syncSegmentTicketPrice({ ...segment, ...partial });
-                      setTicket({ ...ticket, [key]: next });
-                    };
-                    return (
-                      <div
-                        key={key}
-                        className={`grid sm:grid-cols-[1.2fr_1fr_100px_1fr] gap-3 items-end rounded-md border border-border p-3 ${
-                          ready ? "bg-muted/20" : "bg-muted/10 opacity-70"
+                  <div className="rounded-lg border border-dashed border-border bg-muted/20 p-4">
+                    <div className="flex flex-wrap items-center justify-between gap-3">
+                      <p className="text-sm flex items-center gap-2">
+                        <FileUp className="h-4 w-4 text-secondary" />
+                        Ticket PDF
+                      </p>
+                      <Label
+                        htmlFor="ticket-pdf-upload"
+                        className={`inline-flex items-center justify-center rounded-md border border-border bg-background px-3 py-2 text-sm font-medium cursor-pointer hover:bg-muted ${
+                          parsingTicket ? "opacity-60 pointer-events-none" : ""
                         }`}
                       >
-                        <div className="space-y-1 min-w-0">
-                          <Label>{label}</Label>
-                          <p className="text-xs text-muted-foreground truncate">
-                            {ready
-                              ? [
-                                  segment.airline,
-                                  segment.flightNumber,
-                                  segment.departureAirport &&
-                                    `${segment.departureAirport} → ${segment.arrivalAirport || "—"}`,
-                                ]
-                                  .filter(Boolean)
-                                  .join(" · ")
-                              : "Enter flight details above to price this flight"}
-                          </p>
-                        </div>
-                        <div className="space-y-2">
-                          <Label>Unit price</Label>
-                          <div className="flex">
-                            <Input
-                              disabled={!ready}
-                              value={segment.unitPrice}
-                              onChange={(e) => updateSegment({ unitPrice: e.target.value })}
-                              placeholder="Price per ticket"
-                              className="rounded-r-none"
-                            />
-                            <Select
-                              disabled={!ready}
-                              value={segment.currency || "PKR"}
-                              onValueChange={(currency) =>
-                                updateSegment({ currency: currency as TicketCurrency })
-                              }
-                            >
-                              <SelectTrigger className="w-[118px] rounded-l-none border-l-0">
-                                <SelectValue />
-                              </SelectTrigger>
-                              <SelectContent>
-                                {TICKET_CURRENCY_OPTIONS.map((option) => (
-                                  <SelectItem key={option.value} value={option.value}>
-                                    {option.label}
-                                  </SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                          </div>
-                          {segment.currency === "OTHER" && (
-                            <Input
-                              disabled={!ready}
-                              value={segment.currencyOther || ""}
-                              onChange={(e) => updateSegment({ currencyOther: e.target.value })}
-                              placeholder="Currency name / code"
-                              className="mt-2"
-                            />
-                          )}
-                        </div>
-                        <div className="space-y-2">
-                          <Label>Units</Label>
-                          <Input
-                            type="number"
-                            min={1}
-                            max={50}
-                            disabled={!ready}
-                            value={
-                              segment.ticketUnits > 0
-                                ? segment.ticketUnits
-                                : ready
-                                  ? 1
-                                  : ""
-                            }
-                            onChange={(e) =>
-                              updateSegment({
-                                ticketUnits: Math.max(
-                                  1,
-                                  Math.min(50, Number(e.target.value) || 1)
-                                ),
-                              })
-                            }
-                            placeholder="Qty"
-                          />
-                        </div>
-                        <div className="space-y-2">
-                          <Label>Line total</Label>
-                          <div className="relative">
-                            <Input
-                              readOnly
-                              disabled={!ready}
-                              value={formatMoneyAmount(segmentLineTotal(segment))}
-                              placeholder="Auto"
-                              className="pr-16"
-                            />
-                            <span className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-xs text-muted-foreground">
-                              {segmentCurrencyLabel(segment)}
-                            </span>
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })}
-
-                  <div className="grid sm:grid-cols-2 gap-4">
-                    <div className="space-y-2 sm:col-span-2">
-                      <Label>Grand total</Label>
-                      <div className="relative">
-                        <Input
-                          readOnly
-                          value={(() => {
-                            const depLabel = segmentCurrencyLabel(ticket.departure);
-                            const arrLabel = segmentCurrencyLabel(ticket.arrival);
-                            const depTotal = segmentLineTotal(ticket.departure);
-                            const arrTotal = segmentLineTotal(ticket.arrival);
-                            if (!depTotal && !arrTotal) return "";
-                            if (depLabel === arrLabel) {
-                              return `${formatMoneyAmount(ticketGrandTotal(ticket))} ${depLabel}`;
-                            }
-                            return [
-                              depTotal ? `${formatMoneyAmount(depTotal)} ${depLabel}` : "",
-                              arrTotal ? `${formatMoneyAmount(arrTotal)} ${arrLabel}` : "",
-                            ]
-                              .filter(Boolean)
-                              .join(" + ");
-                          })()}
-                          placeholder="Auto from all tickets"
-                        />
-                      </div>
-                    </div>
-                    <div className="space-y-2 sm:col-span-2">
-                      <Label>Ticket notes</Label>
-                      <Textarea
-                        rows={2}
-                        value={ticket.notes}
-                        onChange={(e) => setTicket({ ...ticket, notes: e.target.value })}
+                        {parsingTicket ? "Reading PDF…" : "Choose PDF"}
+                      </Label>
+                      <Input
+                        id="ticket-pdf-upload"
+                        type="file"
+                        accept="application/pdf,.pdf"
+                        className="hidden"
+                        disabled={parsingTicket}
+                        onChange={(e) => {
+                          const file = e.target.files?.[0] || null;
+                          void parseTicketPdf(file);
+                          e.currentTarget.value = "";
+                        }}
                       />
                     </div>
                   </div>
-                </div>
+                </section>
 
-                <TripDocumentsPanel
-                  tripId={trip.id}
-                  type="ticket"
-                  documents={trip.documents}
-                  onChanged={loadTrip}
-                  titlePlaceholder="e.g. Outbound e-ticket"
-                />
+                <section className="space-y-3">
+                  <div>
+                    <h3 className="text-sm font-semibold">2. Booking details</h3>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      PNR, issue info, and payment form from the e-ticket.
+                    </p>
+                  </div>
+                  <div className="grid sm:grid-cols-2 gap-4 rounded-lg border border-border p-4">
+                    <div className="space-y-2">
+                      <Label>GDS / Galileo PNR</Label>
+                      <Input
+                        value={ticket.pnr || ""}
+                        onChange={(e) => setTicket({ ...ticket, pnr: e.target.value })}
+                        placeholder="e.g. H9429R"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Airline PNR</Label>
+                      <Input
+                        value={ticket.airlinePnr || ""}
+                        onChange={(e) => setTicket({ ...ticket, airlinePnr: e.target.value })}
+                        placeholder="e.g. N1UGRP"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Issue date</Label>
+                      <Input
+                        type="date"
+                        value={ticket.issueDate || ""}
+                        onChange={(e) => setTicket({ ...ticket, issueDate: e.target.value })}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Form of payment</Label>
+                      <Input
+                        value={ticket.formOfPayment || ""}
+                        onChange={(e) => setTicket({ ...ticket, formOfPayment: e.target.value })}
+                        placeholder="e.g. INVOICE TT"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Issuing agent</Label>
+                      <Input
+                        value={ticket.issuingAgent || ""}
+                        onChange={(e) => setTicket({ ...ticket, issuingAgent: e.target.value })}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>IATA number</Label>
+                      <Input
+                        value={ticket.iataNumber || ""}
+                        onChange={(e) => setTicket({ ...ticket, iataNumber: e.target.value })}
+                      />
+                    </div>
+                    <div className="space-y-2 sm:col-span-2">
+                      <Label>Tour code</Label>
+                      <Input
+                        value={ticket.tourCode || ""}
+                        onChange={(e) => setTicket({ ...ticket, tourCode: e.target.value })}
+                      />
+                    </div>
+                  </div>
+                </section>
+
+                <section className="space-y-3">
+                  <div>
+                    <h3 className="text-sm font-semibold">3. Passengers</h3>
+                  </div>
+                  <TicketPassengersEditor
+                    value={ticket.passengers || []}
+                    onChange={updatePassengers}
+                  />
+                </section>
+
+                <section className="space-y-3">
+                  <div>
+                    <h3 className="text-sm font-semibold">4. Departure flight</h3>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Outbound flight going to Saudi Arabia.
+                    </p>
+                  </div>
+                  <FlightSegmentEditor
+                    value={ticket.departure}
+                    onChange={(departure) =>
+                      setTicket({
+                        ...ticket,
+                        departure: syncSegmentTicketPrice({
+                          ...departure,
+                          ticketUnits:
+                            ticket.passengers?.length ||
+                            departure.ticketUnits ||
+                            (segmentHasFlightDetails(departure) ? 1 : 0),
+                        }),
+                      })
+                    }
+                  />
+                </section>
+
+                <section className="space-y-3">
+                  <div>
+                    <h3 className="text-sm font-semibold">5. Return flight</h3>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Return flight coming back — can differ from departure.
+                    </p>
+                  </div>
+                  <FlightSegmentEditor
+                    value={ticket.arrival}
+                    onChange={(arrival) =>
+                      setTicket({
+                        ...ticket,
+                        arrival: syncSegmentTicketPrice({
+                          ...arrival,
+                          ticketUnits:
+                            ticket.passengers?.length ||
+                            arrival.ticketUnits ||
+                            (segmentHasFlightDetails(arrival) ? 1 : 0),
+                        }),
+                      })
+                    }
+                  />
+                </section>
+
+                <section className="space-y-3">
+                  <div>
+                    <h3 className="text-sm font-semibold">6. Pricing</h3>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Unit price × ticket units. Totals update automatically.
+                    </p>
+                  </div>
+                  <div className="space-y-4 rounded-lg border border-border p-4">
+                    {(
+                      [
+                        ["departure", "Departure flight"],
+                        ["arrival", "Return flight"],
+                      ] as const
+                    ).map(([key, label]) => {
+                      const segment = ticket[key];
+                      const ready = segmentHasFlightDetails(segment);
+                      const updateSegment = (partial: Partial<FlightSegment>) => {
+                        const next = syncSegmentTicketPrice({ ...segment, ...partial });
+                        setTicket({ ...ticket, [key]: next });
+                      };
+                      return (
+                        <div
+                          key={key}
+                          className={`grid sm:grid-cols-[1.2fr_1fr_100px_1fr] gap-3 items-end rounded-md border border-border p-3 ${
+                            ready ? "bg-muted/20" : "bg-muted/10 opacity-70"
+                          }`}
+                        >
+                          <div className="space-y-1 min-w-0">
+                            <Label>{label}</Label>
+                            <p className="text-xs text-muted-foreground truncate">
+                              {ready
+                                ? [
+                                    segment.airline,
+                                    segment.flightNumber,
+                                    segment.flightDate,
+                                    segment.departureAirport &&
+                                      `${segment.departureAirport} → ${segment.arrivalAirport || "—"}`,
+                                  ]
+                                    .filter(Boolean)
+                                    .join(" · ")
+                                : "Enter flight details above to price this flight"}
+                            </p>
+                          </div>
+                          <div className="space-y-2">
+                            <Label>Unit price</Label>
+                            <div className="flex">
+                              <Input
+                                disabled={!ready}
+                                value={segment.unitPrice}
+                                onChange={(e) => updateSegment({ unitPrice: e.target.value })}
+                                placeholder="Price per ticket"
+                                className="rounded-r-none"
+                              />
+                              <Select
+                                disabled={!ready}
+                                value={segment.currency || "PKR"}
+                                onValueChange={(currency) =>
+                                  updateSegment({ currency: currency as TicketCurrency })
+                                }
+                              >
+                                <SelectTrigger className="w-[118px] rounded-l-none border-l-0">
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {TICKET_CURRENCY_OPTIONS.map((option) => (
+                                    <SelectItem key={option.value} value={option.value}>
+                                      {option.label}
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                            </div>
+                            {segment.currency === "OTHER" && (
+                              <Input
+                                disabled={!ready}
+                                value={segment.currencyOther || ""}
+                                onChange={(e) =>
+                                  updateSegment({ currencyOther: e.target.value })
+                                }
+                                placeholder="Currency name / code"
+                                className="mt-2"
+                              />
+                            )}
+                          </div>
+                          <div className="space-y-2">
+                            <Label>Units</Label>
+                            <Input
+                              type="number"
+                              min={1}
+                              max={50}
+                              disabled={!ready}
+                              value={
+                                segment.ticketUnits > 0
+                                  ? segment.ticketUnits
+                                  : ready
+                                    ? 1
+                                    : ""
+                              }
+                              onChange={(e) =>
+                                updateSegment({
+                                  ticketUnits: Math.max(
+                                    1,
+                                    Math.min(50, Number(e.target.value) || 1)
+                                  ),
+                                })
+                              }
+                              placeholder="Qty"
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <Label>Line total</Label>
+                            <div className="relative">
+                              <Input
+                                readOnly
+                                disabled={!ready}
+                                value={formatMoneyAmount(segmentLineTotal(segment))}
+                                placeholder="Auto"
+                                className="pr-16"
+                              />
+                              <span className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-xs text-muted-foreground">
+                                {segmentCurrencyLabel(segment)}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+
+                    <div className="space-y-2">
+                      <Label>Grand total</Label>
+                      <Input
+                        readOnly
+                        value={(() => {
+                          const depLabel = segmentCurrencyLabel(ticket.departure);
+                          const arrLabel = segmentCurrencyLabel(ticket.arrival);
+                          const depTotal = segmentLineTotal(ticket.departure);
+                          const arrTotal = segmentLineTotal(ticket.arrival);
+                          if (!depTotal && !arrTotal) return "";
+                          if (depLabel === arrLabel) {
+                            return `${formatMoneyAmount(ticketGrandTotal(ticket))} ${depLabel}`;
+                          }
+                          return [
+                            depTotal ? `${formatMoneyAmount(depTotal)} ${depLabel}` : "",
+                            arrTotal ? `${formatMoneyAmount(arrTotal)} ${arrLabel}` : "",
+                          ]
+                            .filter(Boolean)
+                            .join(" + ");
+                        })()}
+                        placeholder="Auto from all tickets"
+                      />
+                    </div>
+                  </div>
+                </section>
+
+                <section className="space-y-3">
+                  <div>
+                    <h3 className="text-sm font-semibold">7. Notes & documents</h3>
+                  </div>
+                  <div className="space-y-2 rounded-lg border border-border p-4">
+                    <Label>Ticket notes</Label>
+                    <Textarea
+                      rows={2}
+                      value={ticket.notes}
+                      onChange={(e) => setTicket({ ...ticket, notes: e.target.value })}
+                    />
+                  </div>
+                  <TripDocumentsPanel
+                    tripId={trip.id}
+                    type="ticket"
+                    documents={trip.documents}
+                    onChanged={loadTrip}
+                    titlePlaceholder="e.g. Outbound e-ticket"
+                  />
+                </section>
 
                 <Button type="button" onClick={saveTrip} disabled={saving}>
                   {saving ? "Saving…" : "Save changes"}

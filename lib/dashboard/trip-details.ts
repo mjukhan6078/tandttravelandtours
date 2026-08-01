@@ -5,6 +5,7 @@ import type {
   PaymentStatus,
   RoomOccupancy,
   StayCity,
+  TicketPassenger,
   TripHotel,
   TripPayment,
   TripTicket,
@@ -23,6 +24,10 @@ import { normalizeTicketCurrency, syncSegmentTicketPrice } from "./ticket-pricin
 
 function newHotelId() {
   return `hotel_${randomBytes(4).toString("hex")}`;
+}
+
+function newPassengerId() {
+  return `pax_${randomBytes(4).toString("hex")}`;
 }
 
 function asString(value: unknown) {
@@ -78,16 +83,24 @@ export function sanitizeFlightSegment(input: unknown): FlightSegment {
   return syncSegmentTicketPrice({
     airline: asString(row.airline),
     flightNumber: asString(row.flightNumber),
+    connectingFlightNumber:
+      flightType === "connecting" ? asString(row.connectingFlightNumber) : "",
+    flightDate: asString(row.flightDate),
     departureAirport: asString(row.departureAirport).toUpperCase(),
     departureTime: asString(row.departureTime),
+    departureTerminal: asString(row.departureTerminal),
     arrivalAirport: asString(row.arrivalAirport).toUpperCase(),
     arrivalTime: asString(row.arrivalTime),
+    arrivalTerminal: asString(row.arrivalTerminal),
     flightType,
     connectingAirport,
     connectingArrivalTime,
     connectingDuration,
     connectingDepartureTime,
+    connectingTerminal: flightType === "connecting" ? asString(row.connectingTerminal) : "",
     connectingStay,
+    bookingClass: asString(row.bookingClass),
+    status: asString(row.status),
     unitPrice,
     currency,
     currencyOther,
@@ -96,6 +109,24 @@ export function sanitizeFlightSegment(input: unknown): FlightSegment {
     luggageAllowance: asString(row.luggageAllowance),
     mealIncluded: asBool(row.mealIncluded),
   });
+}
+
+export function sanitizePassengers(input: unknown): TicketPassenger[] {
+  if (!Array.isArray(input)) return [];
+  return input
+    .map((item) => {
+      if (!item || typeof item !== "object") return null;
+      const row = item as Partial<TicketPassenger>;
+      return {
+        id: typeof row.id === "string" && row.id ? row.id : newPassengerId(),
+        name: asString(row.name),
+        ticketNo: asString(row.ticketNo),
+        passport: asString(row.passport),
+        passportExpiry: asString(row.passportExpiry),
+        nationality: asString(row.nationality),
+      } satisfies TicketPassenger;
+    })
+    .filter((item): item is TicketPassenger => Boolean(item));
 }
 
 function legacySegmentFromFlat(row: Record<string, unknown>): FlightSegment {
@@ -184,9 +215,26 @@ export function sanitizeTicket(input: unknown): TripTicket {
     }
   }
 
+  const passengers = sanitizePassengers(row.passengers);
+  if (passengers.length > 0) {
+    const units = passengers.length;
+    departure = syncSegmentTicketPrice({ ...departure, ticketUnits: units });
+    if (arrival.departureAirport || arrival.airline) {
+      arrival = syncSegmentTicketPrice({ ...arrival, ticketUnits: units });
+    }
+  }
+
   return {
     departure,
     arrival,
+    pnr: asString(row.pnr),
+    airlinePnr: asString(row.airlinePnr),
+    issueDate: asString(row.issueDate),
+    issuingAgent: asString(row.issuingAgent),
+    iataNumber: asString(row.iataNumber),
+    tourCode: asString(row.tourCode),
+    formOfPayment: asString(row.formOfPayment),
+    passengers,
     currency: departure.currency === "OTHER" ? departure.currencyOther || "OTHER" : departure.currency,
     notes: asString(row.notes),
   };
