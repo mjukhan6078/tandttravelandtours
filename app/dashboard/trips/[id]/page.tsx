@@ -10,6 +10,7 @@ import ItineraryEditor, { ensureItinerary } from "@/components/dashboard/Itinera
 import TicketPassengersEditor from "@/components/dashboard/TicketPassengersEditor";
 import TripDocumentsPanel from "@/components/dashboard/TripDocumentsPanel";
 import VisasEditor from "@/components/dashboard/VisasEditor";
+import CollapsibleSection from "@/components/dashboard/CollapsibleSection";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -593,14 +594,13 @@ export default function TripDetailPage() {
               <CardHeader>
                 <CardTitle>Ticket</CardTitle>
               </CardHeader>
-              <CardContent className="space-y-8 min-w-0">
-                <section className="space-y-3 min-w-0">
-                  <div className="space-y-1">
-                    <Label className="text-base text-foreground">Import ticket PDF</Label>
-                    <p className="text-xs text-muted-foreground">
-                      Upload a Galileo e-ticket PDF to auto-fill booking, passengers, and flights.
-                    </p>
-                  </div>
+              <CardContent className="space-y-4 min-w-0">
+                <CollapsibleSection
+                  id="ticket-import"
+                  title="Import ticket PDF"
+                  description="Upload a Galileo e-ticket PDF to auto-fill booking, passengers, and flights."
+                  defaultOpen
+                >
                   <div className="rounded-lg border border-dashed border-border bg-muted/20 p-3 sm:p-4">
                     <div className="flex flex-wrap items-center justify-between gap-3">
                       <p className="text-sm font-medium text-foreground flex items-center gap-2">
@@ -629,16 +629,20 @@ export default function TripDetailPage() {
                       />
                     </div>
                   </div>
-                </section>
+                </CollapsibleSection>
 
-                <section className="space-y-3 min-w-0">
-                  <div className="space-y-1">
-                    <Label className="text-base text-foreground">Booking details</Label>
-                    <p className="text-xs text-muted-foreground">
-                      PNR, issue info, and payment form from the e-ticket.
-                    </p>
-                  </div>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 rounded-lg border border-border bg-muted/10 p-3 sm:p-4">
+                <CollapsibleSection
+                  id="ticket-booking"
+                  title="Booking details"
+                  description="PNR, issue info, and payment form from the e-ticket."
+                  summary={
+                    [ticket.pnr && `PNR ${ticket.pnr}`, ticket.airlinePnr && `A/L ${ticket.airlinePnr}`]
+                      .filter(Boolean)
+                      .join(" · ") || undefined
+                  }
+                  defaultOpen
+                >
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
                     <div className="space-y-1.5 min-w-0">
                       <Label>GDS / Galileo PNR</Label>
                       <Input
@@ -693,22 +697,48 @@ export default function TripDetailPage() {
                       />
                     </div>
                   </div>
-                </section>
+                </CollapsibleSection>
 
-                <section className="space-y-3 min-w-0">
+                <CollapsibleSection
+                  id="ticket-passengers"
+                  title="Passengers"
+                  description="One card per passenger. Pricing units follow this count."
+                  summary={
+                    ticket.passengers?.length
+                      ? `${ticket.passengers.length} passenger${
+                          ticket.passengers.length === 1 ? "" : "s"
+                        }`
+                      : "No passengers yet"
+                  }
+                  defaultOpen
+                >
                   <TicketPassengersEditor
                     value={ticket.passengers || []}
                     onChange={updatePassengers}
+                    showHeader={false}
                   />
-                </section>
+                </CollapsibleSection>
 
-                <section className="space-y-3 min-w-0">
-                  <div className="space-y-1">
-                    <Label className="text-base text-foreground">Departure flight</Label>
-                    <p className="text-xs text-muted-foreground">
-                      Outbound flight going to Saudi Arabia.
-                    </p>
-                  </div>
+                <CollapsibleSection
+                  id="ticket-departure"
+                  title="Departure flight"
+                  description="Outbound flight going to Saudi Arabia."
+                  summary={
+                    segmentHasFlightDetails(ticket.departure)
+                      ? [
+                          ticket.departure.airline,
+                          ticket.departure.flightNumber,
+                          ticket.departure.departureAirport &&
+                            `${ticket.departure.departureAirport} → ${
+                              ticket.departure.arrivalAirport || "—"
+                            }`,
+                        ]
+                          .filter(Boolean)
+                          .join(" · ")
+                      : "No flight details yet"
+                  }
+                  defaultOpen
+                >
                   <FlightSegmentEditor
                     value={ticket.departure}
                     onChange={(departure) =>
@@ -724,15 +754,28 @@ export default function TripDetailPage() {
                       })
                     }
                   />
-                </section>
+                </CollapsibleSection>
 
-                <section className="space-y-3 min-w-0">
-                  <div className="space-y-1">
-                    <Label className="text-base text-foreground">Return flight</Label>
-                    <p className="text-xs text-muted-foreground">
-                      Return flight coming back — can differ from departure.
-                    </p>
-                  </div>
+                <CollapsibleSection
+                  id="ticket-return"
+                  title="Return flight"
+                  description="Return flight coming back — can differ from departure."
+                  summary={
+                    segmentHasFlightDetails(ticket.arrival)
+                      ? [
+                          ticket.arrival.airline,
+                          ticket.arrival.flightNumber,
+                          ticket.arrival.departureAirport &&
+                            `${ticket.arrival.departureAirport} → ${
+                              ticket.arrival.arrivalAirport || "—"
+                            }`,
+                        ]
+                          .filter(Boolean)
+                          .join(" · ")
+                      : "No flight details yet"
+                  }
+                  defaultOpen
+                >
                   <FlightSegmentEditor
                     value={ticket.arrival}
                     onChange={(arrival) =>
@@ -748,16 +791,15 @@ export default function TripDetailPage() {
                       })
                     }
                   />
-                </section>
+                </CollapsibleSection>
 
-                <section className="space-y-3 min-w-0">
-                  <div className="space-y-1">
-                    <Label className="text-base text-foreground">Ticket pricing</Label>
-                    <p className="text-xs text-muted-foreground">
-                      Unit price × ticket units. Totals update automatically.
-                    </p>
-                  </div>
-                  <div className="space-y-3 sm:space-y-4 rounded-lg border border-border bg-muted/10 p-3 sm:p-4">
+                <CollapsibleSection
+                  id="ticket-pricing"
+                  title="Ticket pricing"
+                  description="Unit price × ticket units. Totals update automatically."
+                  defaultOpen
+                >
+                  <div className="space-y-3 sm:space-y-4">
                     {(
                       [
                         ["departure", "Departure flight"],
@@ -902,12 +944,14 @@ export default function TripDetailPage() {
                       />
                     </div>
                   </div>
-                </section>
+                </CollapsibleSection>
 
-                <section className="space-y-3 min-w-0">
-                  <div className="space-y-1">
-                    <Label className="text-base text-foreground">Notes & documents</Label>
-                  </div>
+                <CollapsibleSection
+                  id="ticket-notes"
+                  title="Notes & documents"
+                  description="Ticket notes and uploaded documents."
+                  defaultOpen={false}
+                >
                   <div className="space-y-1.5">
                     <Label>Ticket notes</Label>
                     <Textarea
@@ -923,7 +967,7 @@ export default function TripDetailPage() {
                     onChanged={loadTrip}
                     titlePlaceholder="e.g. Outbound e-ticket"
                   />
-                </section>
+                </CollapsibleSection>
 
                 <Button type="button" onClick={saveTrip} disabled={saving}>
                   {saving ? "Saving…" : "Save changes"}
