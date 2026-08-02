@@ -34,10 +34,71 @@ function Section({
   children: ReactNode;
 }) {
   return (
-    <div className="space-y-3 rounded-md border border-border/70 bg-background/70 p-3 sm:p-3.5">
-      <p className="text-sm font-medium">{title}</p>
+    <div className="space-y-3 rounded-lg border border-border bg-background p-3 sm:p-4">
+      <p className="text-sm font-medium text-foreground">{title}</p>
       {children}
     </div>
+  );
+}
+
+function Field({
+  label,
+  children,
+  className = "",
+}: {
+  label: string;
+  children: ReactNode;
+  className?: string;
+}) {
+  return (
+    <div className={`space-y-1.5 min-w-0 ${className}`}>
+      <Label className="text-sm font-medium text-foreground">{label}</Label>
+      {children}
+    </div>
+  );
+}
+
+function ColumnCard({
+  title,
+  children,
+}: {
+  title: string;
+  children: ReactNode;
+}) {
+  return (
+    <div className="flex h-full min-w-0 flex-col gap-3 rounded-lg border border-border bg-muted/20 p-3">
+      <p className="text-sm font-semibold text-primary leading-none">{title}</p>
+      <div className="flex flex-1 flex-col gap-3">{children}</div>
+    </div>
+  );
+}
+
+function LayoverSelect({
+  value,
+  onChange,
+  className,
+}: {
+  value: string;
+  onChange: (hours: number) => void;
+  className?: string;
+}) {
+  const hours = parseConnectingDuration(value).hours;
+  return (
+    <Select
+      value={hours > 0 ? String(hours) : undefined}
+      onValueChange={(v) => onChange(Number(v))}
+    >
+      <SelectTrigger className={className || "w-full"}>
+        <SelectValue placeholder="Hours" />
+      </SelectTrigger>
+      <SelectContent>
+        {Array.from({ length: 24 }, (_, i) => i + 1).map((h) => (
+          <SelectItem key={h} value={String(h)}>
+            {h}h
+          </SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
   );
 }
 
@@ -102,19 +163,20 @@ export default function FlightSegmentEditor({
     patch({ connectingDepartureTime });
   };
 
+  const isConnecting = value.flightType === "connecting";
+
   return (
-    <div className="space-y-3 sm:space-y-4 rounded-lg border border-border bg-muted/20 p-3 sm:p-4">
+    <div className="space-y-3 sm:space-y-4 rounded-lg border border-border bg-muted/10 p-3 sm:p-4">
       {(title || hint) && (
-        <div>
-          {title && <h3 className="text-sm font-semibold text-foreground">{title}</h3>}
-          {hint && <p className="text-xs text-muted-foreground mt-1">{hint}</p>}
+        <div className="space-y-1">
+          {title && <p className="text-sm font-medium text-foreground">{title}</p>}
+          {hint && <p className="text-xs text-muted-foreground">{hint}</p>}
         </div>
       )}
 
       <Section title="Airline & flight">
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          <div className="space-y-2 min-w-0">
-            <Label>Airline</Label>
+          <Field label="Airline">
             <Select
               value={value.airline || undefined}
               onValueChange={(airline) => patch({ airline })}
@@ -134,9 +196,8 @@ export default function FlightSegmentEditor({
                 ))}
               </SelectContent>
             </Select>
-          </div>
-          <div className="space-y-2 min-w-0">
-            <Label>Flight type</Label>
+          </Field>
+          <Field label="Flight type">
             <Select
               value={value.flightType}
               onValueChange={(flightType) => patch({ flightType: flightType as FlightType })}
@@ -152,32 +213,29 @@ export default function FlightSegmentEditor({
                 ))}
               </SelectContent>
             </Select>
-          </div>
-          <div className="space-y-2 min-w-0">
-            <Label>Flight date</Label>
+          </Field>
+          <Field label="Flight date">
             <Input
               type="date"
               value={value.flightDate || ""}
               onChange={(e) => patch({ flightDate: e.target.value })}
             />
-          </div>
-          <div className="space-y-2 min-w-0">
-            <Label>Flight number</Label>
+          </Field>
+          <Field label="Flight number">
             <Input
               value={value.flightNumber}
               onChange={(e) => patch({ flightNumber: e.target.value })}
               placeholder="e.g. FZ 336"
             />
-          </div>
-          {value.flightType === "connecting" && (
-            <div className="space-y-2 min-w-0 sm:col-span-2">
-              <Label>Connecting flight number</Label>
+          </Field>
+          {isConnecting && (
+            <Field label="Connecting flight number" className="sm:col-span-2">
               <Input
                 value={value.connectingFlightNumber || ""}
                 onChange={(e) => patch({ connectingFlightNumber: e.target.value })}
                 placeholder="e.g. FZ 827"
               />
-            </div>
+            </Field>
           )}
         </div>
       </Section>
@@ -185,182 +243,128 @@ export default function FlightSegmentEditor({
       <Section title="Route">
         <div
           className={
-            value.flightType === "connecting"
-              ? "grid grid-cols-1 md:grid-cols-[1fr_1.5fr_1fr] gap-4"
-              : "grid grid-cols-1 sm:grid-cols-2 gap-4"
+            isConnecting
+              ? "grid grid-cols-1 lg:grid-cols-3 gap-3 items-stretch"
+              : "grid grid-cols-1 sm:grid-cols-2 gap-3 items-stretch"
           }
         >
-          <div className="space-y-2 min-w-0">
-            <Label>Departure</Label>
-            <AirportSelect
-              value={value.departureAirport}
-              onChange={(departureAirport) => patch({ departureAirport })}
-              placeholder="Departure airport"
-            />
-            <Input
-              type="time"
-              value={value.departureTime || ""}
-              onChange={(e) => patch({ departureTime: e.target.value })}
-              aria-label="Departure time"
-            />
-            <Input
-              value={value.departureTerminal || ""}
-              onChange={(e) => patch({ departureTerminal: e.target.value })}
-              placeholder="Terminal"
-            />
-          </div>
-
-          {value.flightType === "connecting" && (
-            <div className="space-y-2 min-w-0 rounded-md border border-border/60 bg-muted/30 p-3 md:border-0 md:bg-transparent md:p-0">
-              <Label>Via</Label>
+          <ColumnCard title="Departure">
+            <Field label="Airport">
               <AirportSelect
-                value={value.connectingAirport || ""}
-                onChange={(connectingAirport) => patch({ connectingAirport })}
-                placeholder="Connecting airport"
+                value={value.departureAirport}
+                onChange={(departureAirport) => patch({ departureAirport })}
+                placeholder="Select airport"
               />
+            </Field>
+            <Field label="Time">
+              <Input
+                type="time"
+                value={value.departureTime || ""}
+                onChange={(e) => patch({ departureTime: e.target.value })}
+              />
+            </Field>
+            <Field label="Terminal">
+              <Input
+                value={value.departureTerminal || ""}
+                onChange={(e) => patch({ departureTerminal: e.target.value })}
+                placeholder="e.g. M"
+              />
+            </Field>
+          </ColumnCard>
 
-              {/* Mobile: stacked arrive → layover → depart */}
-              <div className="space-y-3 md:hidden">
-                <div className="space-y-2">
-                  <p className="text-xs text-muted-foreground">Arrive at via</p>
-                  <div className="grid grid-cols-2 gap-2">
-                    <Input
-                      type="time"
-                      value={value.connectingArrivalTime || ""}
-                      onChange={(e) => updateViaArrival(e.target.value)}
-                      aria-label="Arrival time at connecting airport"
-                    />
-                    <Input
-                      value={value.connectingArrivalTerminal || ""}
-                      onChange={(e) => patch({ connectingArrivalTerminal: e.target.value })}
-                      placeholder="Arrive terminal"
-                      aria-label="Arrival terminal at connecting airport"
-                    />
-                  </div>
-                </div>
-                <div className="space-y-2">
-                  <p className="text-xs text-muted-foreground">Layover</p>
-                  <Select
-                    value={
-                      parseConnectingDuration(value.connectingDuration).hours > 0
-                        ? String(parseConnectingDuration(value.connectingDuration).hours)
-                        : undefined
-                    }
-                    onValueChange={(v) => updateViaDuration(Number(v))}
-                  >
-                    <SelectTrigger className="w-full" aria-label="Connecting stay duration hours">
-                      <SelectValue placeholder="Hours" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {Array.from({ length: 24 }, (_, i) => i + 1).map((hours) => (
-                        <SelectItem key={hours} value={String(hours)}>
-                          {hours}h
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-2">
-                  <p className="text-xs text-muted-foreground">Depart from via</p>
-                  <div className="grid grid-cols-2 gap-2">
-                    <Input
-                      type="time"
-                      value={value.connectingDepartureTime || ""}
-                      onChange={(e) => updateViaDeparture(e.target.value)}
-                      aria-label="Departure time from connecting airport"
-                    />
-                    <Input
-                      value={value.connectingDepartureTerminal || ""}
-                      onChange={(e) => patch({ connectingDepartureTerminal: e.target.value })}
-                      placeholder="Depart terminal"
-                      aria-label="Departure terminal from connecting airport"
-                    />
-                  </div>
-                </div>
-              </div>
+          {isConnecting && (
+            <ColumnCard title="Via">
+              <Field label="Airport">
+                <AirportSelect
+                  value={value.connectingAirport || ""}
+                  onChange={(connectingAirport) => patch({ connectingAirport })}
+                  placeholder="Select airport"
+                />
+              </Field>
 
-              {/* Desktop: arrive | hours | depart */}
-              <div className="hidden md:grid md:grid-cols-[1fr_auto_1fr] gap-2 items-start">
-                <div className="space-y-2 min-w-0">
+              <div className="grid grid-cols-1 sm:grid-cols-[1fr_auto_1fr] gap-3">
+                <Field label="Arrive time">
                   <Input
                     type="time"
                     value={value.connectingArrivalTime || ""}
                     onChange={(e) => updateViaArrival(e.target.value)}
-                    aria-label="Arrival time at connecting airport"
                   />
-                  <Input
-                    value={value.connectingArrivalTerminal || ""}
-                    onChange={(e) => patch({ connectingArrivalTerminal: e.target.value })}
-                    placeholder="Arrive terminal"
-                    aria-label="Arrival terminal at connecting airport"
+                </Field>
+                <Field label="Layover" className="sm:w-[92px]">
+                  <LayoverSelect
+                    value={value.connectingDuration}
+                    onChange={updateViaDuration}
+                    className="w-full"
                   />
-                </div>
-                <Select
-                  value={
-                    parseConnectingDuration(value.connectingDuration).hours > 0
-                      ? String(parseConnectingDuration(value.connectingDuration).hours)
-                      : undefined
-                  }
-                  onValueChange={(v) => updateViaDuration(Number(v))}
-                >
-                  <SelectTrigger className="w-[88px]" aria-label="Connecting stay duration hours">
-                    <SelectValue placeholder="Hours" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {Array.from({ length: 24 }, (_, i) => i + 1).map((hours) => (
-                      <SelectItem key={hours} value={String(hours)}>
-                        {hours}h
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <div className="space-y-2 min-w-0">
+                </Field>
+                <Field label="Depart time">
                   <Input
                     type="time"
                     value={value.connectingDepartureTime || ""}
                     onChange={(e) => updateViaDeparture(e.target.value)}
-                    aria-label="Departure time from connecting airport"
                   />
+                </Field>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <Field label="Arrive terminal">
+                  <Input
+                    value={value.connectingArrivalTerminal || ""}
+                    onChange={(e) => patch({ connectingArrivalTerminal: e.target.value })}
+                    placeholder="e.g. 2"
+                  />
+                </Field>
+                <Field label="Depart terminal">
                   <Input
                     value={value.connectingDepartureTerminal || ""}
                     onChange={(e) => patch({ connectingDepartureTerminal: e.target.value })}
-                    placeholder="Depart terminal"
-                    aria-label="Departure terminal from connecting airport"
+                    placeholder="e.g. 2"
                   />
-                </div>
+                </Field>
               </div>
-            </div>
+            </ColumnCard>
           )}
 
-          <div className="space-y-2 min-w-0">
-            <Label>Arrival</Label>
-            <AirportSelect
-              value={value.arrivalAirport}
-              onChange={(arrivalAirport) => patch({ arrivalAirport })}
-              placeholder="Arrival airport"
-            />
-            <Input
-              type="time"
-              value={value.arrivalTime || ""}
-              onChange={(e) => patch({ arrivalTime: e.target.value })}
-              aria-label="Arrival time"
-            />
-            <Input
-              value={value.arrivalTerminal || ""}
-              onChange={(e) => patch({ arrivalTerminal: e.target.value })}
-              placeholder="Terminal"
-            />
-          </div>
+          <ColumnCard title="Arrival">
+            <Field label="Airport">
+              <AirportSelect
+                value={value.arrivalAirport}
+                onChange={(arrivalAirport) => patch({ arrivalAirport })}
+                placeholder="Select airport"
+              />
+            </Field>
+            <Field label="Time">
+              <Input
+                type="time"
+                value={value.arrivalTime || ""}
+                onChange={(e) => patch({ arrivalTime: e.target.value })}
+              />
+            </Field>
+            <Field label="Terminal">
+              <Input
+                value={value.arrivalTerminal || ""}
+                onChange={(e) => patch({ arrivalTerminal: e.target.value })}
+                placeholder="e.g. 1"
+              />
+            </Field>
+          </ColumnCard>
         </div>
 
-        {value.flightType === "connecting" && value.connectingStay && (
-          <p className="text-xs sm:text-sm text-muted-foreground rounded-md border border-border px-3 py-2 break-words">
-            {value.departureAirport || "—"}
-            {value.departureTime ? ` ${value.departureTime}` : ""} → {value.connectingStay}
+        {isConnecting && value.connectingStay && (
+          <p className="mt-3 text-sm text-muted-foreground rounded-md border border-border bg-muted/30 px-3 py-2.5 break-words leading-relaxed">
+            <span className="font-medium text-foreground">
+              {value.departureAirport || "—"}
+            </span>
+            {value.departureTime ? ` ${value.departureTime}` : ""}
+            {" → "}
+            <span className="font-medium text-foreground">{value.connectingStay}</span>
             {value.connectingArrivalTime || value.connectingDepartureTime
               ? ` (${value.connectingArrivalTime || "—"} → ${value.connectingDepartureTime || "—"})`
-              : ""}{" "}
-            → {value.arrivalAirport || "—"}
+              : ""}
+            {" → "}
+            <span className="font-medium text-foreground">
+              {value.arrivalAirport || "—"}
+            </span>
             {value.arrivalTime ? ` ${value.arrivalTime}` : ""}
           </p>
         )}
@@ -368,32 +372,29 @@ export default function FlightSegmentEditor({
 
       <Section title="Status & services">
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          <div className="space-y-2 min-w-0">
-            <Label>Booking class</Label>
+          <Field label="Booking class">
             <Input
               value={value.bookingClass || ""}
               onChange={(e) => patch({ bookingClass: e.target.value })}
               placeholder="e.g. Y / Economy"
             />
-          </div>
-          <div className="space-y-2 min-w-0">
-            <Label>Status</Label>
+          </Field>
+          <Field label="Status">
             <Input
               value={value.status || ""}
               onChange={(e) => patch({ status: e.target.value })}
               placeholder="e.g. HK - Confirmed"
             />
-          </div>
-          <div className="space-y-2 min-w-0 sm:col-span-2">
-            <Label>Luggage allowance</Label>
+          </Field>
+          <Field label="Luggage allowance" className="sm:col-span-2">
             <Input
               value={value.luggageAllowance}
               onChange={(e) => patch({ luggageAllowance: e.target.value })}
               placeholder="e.g. 30kg"
             />
-          </div>
-          <label className="flex items-center justify-between gap-3 rounded-md border border-border px-3 py-2 sm:col-span-2">
-            <span className="text-sm">Meal included</span>
+          </Field>
+          <label className="flex items-center justify-between gap-3 rounded-md border border-border bg-muted/20 px-3 py-2.5 sm:col-span-2">
+            <span className="text-sm font-medium text-foreground">Meal included</span>
             <Switch
               checked={value.mealIncluded}
               onCheckedChange={(checked) => patch({ mealIncluded: checked })}

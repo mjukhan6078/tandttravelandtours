@@ -540,18 +540,18 @@ export default function TripDetailPage() {
               <CardHeader>
                 <CardTitle>Ticket</CardTitle>
               </CardHeader>
-              <CardContent className="space-y-6 min-w-0">
+              <CardContent className="space-y-8 min-w-0">
                 <section className="space-y-3 min-w-0">
-                  <div>
-                    <Label className="text-base">Import ticket PDF</Label>
-                    <p className="text-xs text-muted-foreground mt-1">
+                  <div className="space-y-1">
+                    <Label className="text-base text-foreground">Import ticket PDF</Label>
+                    <p className="text-xs text-muted-foreground">
                       Upload a Galileo e-ticket PDF to auto-fill booking, passengers, and flights.
                     </p>
                   </div>
                   <div className="rounded-lg border border-dashed border-border bg-muted/20 p-3 sm:p-4">
                     <div className="flex flex-wrap items-center justify-between gap-3">
-                      <p className="text-sm font-medium flex items-center gap-2">
-                        <FileUp className="h-4 w-4 text-secondary shrink-0" />
+                      <p className="text-sm font-medium text-foreground flex items-center gap-2">
+                        <FileUp className="h-4 w-4 text-primary shrink-0" />
                         Ticket PDF
                       </p>
                       <Label
@@ -579,14 +579,14 @@ export default function TripDetailPage() {
                 </section>
 
                 <section className="space-y-3 min-w-0">
-                  <div>
-                    <Label className="text-base">Booking details</Label>
-                    <p className="text-xs text-muted-foreground mt-1">
+                  <div className="space-y-1">
+                    <Label className="text-base text-foreground">Booking details</Label>
+                    <p className="text-xs text-muted-foreground">
                       PNR, issue info, and payment form from the e-ticket.
                     </p>
                   </div>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 rounded-lg border border-border p-3 sm:p-4">
-                    <div className="space-y-2">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 rounded-lg border border-border bg-muted/10 p-3 sm:p-4">
+                    <div className="space-y-1.5 min-w-0">
                       <Label>GDS / Galileo PNR</Label>
                       <Input
                         value={ticket.pnr || ""}
@@ -594,7 +594,7 @@ export default function TripDetailPage() {
                         placeholder="e.g. H9429R"
                       />
                     </div>
-                    <div className="space-y-2">
+                    <div className="space-y-1.5 min-w-0">
                       <Label>Airline PNR</Label>
                       <Input
                         value={ticket.airlinePnr || ""}
@@ -602,7 +602,7 @@ export default function TripDetailPage() {
                         placeholder="e.g. N1UGRP"
                       />
                     </div>
-                    <div className="space-y-2">
+                    <div className="space-y-1.5 min-w-0">
                       <Label>Issue date</Label>
                       <Input
                         type="date"
@@ -610,7 +610,7 @@ export default function TripDetailPage() {
                         onChange={(e) => setTicket({ ...ticket, issueDate: e.target.value })}
                       />
                     </div>
-                    <div className="space-y-2">
+                    <div className="space-y-1.5 min-w-0">
                       <Label>Form of payment</Label>
                       <Input
                         value={ticket.formOfPayment || ""}
@@ -618,21 +618,21 @@ export default function TripDetailPage() {
                         placeholder="e.g. INVOICE TT"
                       />
                     </div>
-                    <div className="space-y-2">
+                    <div className="space-y-1.5 min-w-0">
                       <Label>Issuing agent</Label>
                       <Input
                         value={ticket.issuingAgent || ""}
                         onChange={(e) => setTicket({ ...ticket, issuingAgent: e.target.value })}
                       />
                     </div>
-                    <div className="space-y-2">
+                    <div className="space-y-1.5 min-w-0">
                       <Label>IATA number</Label>
                       <Input
                         value={ticket.iataNumber || ""}
                         onChange={(e) => setTicket({ ...ticket, iataNumber: e.target.value })}
                       />
                     </div>
-                    <div className="space-y-2 sm:col-span-2">
+                    <div className="space-y-1.5 min-w-0 sm:col-span-2">
                       <Label>Tour code</Label>
                       <Input
                         value={ticket.tourCode || ""}
@@ -650,9 +650,9 @@ export default function TripDetailPage() {
                 </section>
 
                 <section className="space-y-3 min-w-0">
-                  <div>
-                    <Label className="text-base">Departure flight</Label>
-                    <p className="text-xs text-muted-foreground mt-1">
+                  <div className="space-y-1">
+                    <Label className="text-base text-foreground">Departure flight</Label>
+                    <p className="text-xs text-muted-foreground">
                       Outbound flight going to Saudi Arabia.
                     </p>
                   </div>
@@ -674,9 +674,9 @@ export default function TripDetailPage() {
                 </section>
 
                 <section className="space-y-3 min-w-0">
-                  <div>
-                    <Label className="text-base">Return flight</Label>
-                    <p className="text-xs text-muted-foreground mt-1">
+                  <div className="space-y-1">
+                    <Label className="text-base text-foreground">Return flight</Label>
+                    <p className="text-xs text-muted-foreground">
                       Return flight coming back — can differ from departure.
                     </p>
                   </div>
@@ -698,13 +698,13 @@ export default function TripDetailPage() {
                 </section>
 
                 <section className="space-y-3 min-w-0">
-                  <div>
-                    <Label className="text-base">Ticket pricing</Label>
-                    <p className="text-xs text-muted-foreground mt-1">
+                  <div className="space-y-1">
+                    <Label className="text-base text-foreground">Ticket pricing</Label>
+                    <p className="text-xs text-muted-foreground">
                       Unit price × ticket units. Totals update automatically.
                     </p>
                   </div>
-                  <div className="space-y-3 sm:space-y-4 rounded-lg border border-border p-3 sm:p-4">
+                  <div className="space-y-3 sm:space-y-4 rounded-lg border border-border bg-muted/10 p-3 sm:p-4">
                     {(
                       [
                         ["departure", "Departure flight"],
@@ -852,10 +852,10 @@ export default function TripDetailPage() {
                 </section>
 
                 <section className="space-y-3 min-w-0">
-                  <div>
-                    <Label className="text-base">Notes & documents</Label>
+                  <div className="space-y-1">
+                    <Label className="text-base text-foreground">Notes & documents</Label>
                   </div>
-                  <div className="space-y-2">
+                  <div className="space-y-1.5">
                     <Label>Ticket notes</Label>
                     <Textarea
                       rows={2}
