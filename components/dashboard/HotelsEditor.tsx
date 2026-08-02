@@ -22,11 +22,13 @@ import { Textarea } from "@/components/ui/textarea";
 import {
   ROOM_OCCUPANCY_LABELS,
   STAY_CITY_LABELS,
+  TICKET_CURRENCY_OPTIONS,
   defaultHotel,
   defaultHotelPackage,
   defaultTransport,
   type RoomOccupancy,
   type StayCity,
+  type TicketCurrency,
   type TripHotel,
   type TripHotelPackage,
   type TripTransport,
@@ -418,6 +420,49 @@ export default function HotelsEditor({
                       ))}
                     </div>
 
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div className="space-y-1.5 min-w-0">
+                        <Label>Hotel cost</Label>
+                        <Input
+                          inputMode="decimal"
+                          value={hotel.cost || ""}
+                          onChange={(e) => updateHotel(hotel.id, { cost: e.target.value })}
+                          placeholder="e.g. 120000"
+                        />
+                      </div>
+                      <div className="space-y-1.5 min-w-0">
+                        <Label>Currency</Label>
+                        <Select
+                          value={hotel.currency || "PKR"}
+                          onValueChange={(currency) =>
+                            updateHotel(hotel.id, { currency: currency as TicketCurrency })
+                          }
+                        >
+                          <SelectTrigger className="w-full">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {TICKET_CURRENCY_OPTIONS.map((option) => (
+                              <SelectItem key={option.value} value={option.value}>
+                                {option.label}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      {hotel.currency === "OTHER" && (
+                        <div className="space-y-1.5 min-w-0 sm:col-span-2">
+                          <Label>Other currency</Label>
+                          <Input
+                            value={hotel.currencyOther || ""}
+                            onChange={(e) =>
+                              updateHotel(hotel.id, { currencyOther: e.target.value })
+                            }
+                          />
+                        </div>
+                      )}
+                    </div>
+
                     <div className="space-y-1.5">
                       <Label>Notes</Label>
                       <Textarea
@@ -546,6 +591,46 @@ export default function HotelsEditor({
                         placeholder="e.g. NAZIR AHMED (+966…)"
                       />
                     </div>
+                    <div className="space-y-1.5 min-w-0">
+                      <Label>Transfer cost</Label>
+                      <Input
+                        inputMode="decimal"
+                        value={row.cost || ""}
+                        onChange={(e) => updateTransport(row.id, { cost: e.target.value })}
+                        placeholder="e.g. 15000"
+                      />
+                    </div>
+                    <div className="space-y-1.5 min-w-0">
+                      <Label>Currency</Label>
+                      <Select
+                        value={row.currency || "PKR"}
+                        onValueChange={(currency) =>
+                          updateTransport(row.id, { currency: currency as TicketCurrency })
+                        }
+                      >
+                        <SelectTrigger className="w-full">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {TICKET_CURRENCY_OPTIONS.map((option) => (
+                            <SelectItem key={option.value} value={option.value}>
+                              {option.label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    {row.currency === "OTHER" && (
+                      <div className="space-y-1.5 min-w-0 sm:col-span-2">
+                        <Label>Other currency</Label>
+                        <Input
+                          value={row.currencyOther || ""}
+                          onChange={(e) =>
+                            updateTransport(row.id, { currencyOther: e.target.value })
+                          }
+                        />
+                      </div>
+                    )}
                     <div className="space-y-1.5 min-w-0 sm:col-span-2">
                       <Label>Notes</Label>
                       <Textarea

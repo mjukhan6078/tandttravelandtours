@@ -3,6 +3,7 @@ import type {
   FlightSegment,
   FlightType,
   PaymentStatus,
+  PaymentTransaction,
   RoomOccupancy,
   StayCity,
   TicketPassenger,
@@ -20,9 +21,11 @@ import {
   defaultFlightSegment,
   defaultHotelPackage,
   defaultPayment,
+  defaultPaymentTransaction,
   defaultTicket,
   defaultVisa,
 } from "./types";
+import { syncPaymentTotals } from "./payment";
 import { formatConnectingStay } from "./connecting";
 import {
   normalizeTicketCurrency,
@@ -36,6 +39,10 @@ function newHotelId() {
 
 function newTransportId() {
   return `transport_${randomBytes(4).toString("hex")}`;
+}
+
+function newPaymentTxnId() {
+  return `pay_txn_${randomBytes(4).toString("hex")}`;
 }
 
 function newPassengerId() {
@@ -391,6 +398,9 @@ export function sanitizeHotels(input: unknown): TripHotel[] {
         breakfast: asBool(row.breakfast),
         lunch: asBool(row.lunch),
         dinner: asBool(row.dinner),
+        cost: asString(row.cost),
+        currency: normalizeTicketCurrency(row.currency),
+        currencyOther: asString(row.currencyOther),
         notes: asString(row.notes),
       } satisfies TripHotel;
     })
@@ -411,10 +421,36 @@ export function sanitizeTransports(input: unknown): TripTransport[] {
         pickupDate: asString(row.pickupDate),
         contactPerson: asString(row.contactPerson),
         bookingRef: asString(row.bookingRef),
+        cost: asString(row.cost),
+        currency: normalizeTicketCurrency(row.currency),
+        currencyOther: asString(row.currencyOther),
         notes: asString(row.notes),
       } satisfies TripTransport;
     })
     .filter((item): item is TripTransport => Boolean(item));
+}
+
+export function sanitizePaymentTransactions(input: unknown): PaymentTransaction[] {
+  if (!Array.isArray(input)) return [];
+  return input
+    .map((item) => {
+      if (!item || typeof item !== "object") return null;
+      const row = item as Partial<PaymentTransaction>;
+      const source = row.source === "receipt" ? "receipt" : "manual";
+      return {
+        ...defaultPaymentTransaction(),
+        id: typeof row.id === "string" && row.id ? row.id : newPaymentTxnId(),
+        amount: asString(row.amount),
+        currency: asString(row.currency) || "PKR",
+        method: asString(row.method),
+        reference: asString(row.reference),
+        paidAt: asString(row.paidAt),
+        notes: asString(row.notes),
+        documentId: asString(row.documentId),
+        source,
+      } satisfies PaymentTransaction;
+    })
+    .filter((item): item is PaymentTransaction => Boolean(item));
 }
 
 export function sanitizePayment(input: unknown): TripPayment {
@@ -425,12 +461,14 @@ export function sanitizePayment(input: unknown): TripPayment {
   const status = statusOptions.includes(row.status as PaymentStatus)
     ? (row.status as PaymentStatus)
     : "unpaid";
-  return {
+  return syncPaymentTotals({
     totalAmount: asString(row.totalAmount),
     paidAmount: asString(row.paidAmount),
     currency: asString(row.currency) || "PKR",
     method: asString(row.method),
     status,
     notes: asString(row.notes),
-  };
+    totalManual: asBool(row.totalManual),
+    transactions: sanitizePaymentTransactions(row.transactions),
+  });
 }

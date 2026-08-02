@@ -203,6 +203,10 @@ export interface TripHotel {
   breakfast: boolean;
   lunch: boolean;
   dinner: boolean;
+  /** Stay cost (total for this hotel card) */
+  cost: string;
+  currency: TicketCurrency;
+  currencyOther: string;
   notes: string;
 }
 
@@ -216,16 +220,39 @@ export interface TripTransport {
   pickupDate: string;
   contactPerson: string;
   bookingRef: string;
+  /** Transfer cost */
+  cost: string;
+  currency: TicketCurrency;
+  currencyOther: string;
   notes: string;
 }
 
+export interface PaymentTransaction {
+  id: string;
+  amount: string;
+  currency: string;
+  method: string;
+  reference: string;
+  /** YYYY-MM-DD */
+  paidAt: string;
+  notes: string;
+  /** Linked uploaded receipt document id */
+  documentId: string;
+  source: "manual" | "receipt";
+}
+
 export interface TripPayment {
+  /** Auto from services unless totalManual */
   totalAmount: string;
+  /** Auto from sum of transactions */
   paidAmount: string;
   currency: string;
   method: string;
   status: PaymentStatus;
   notes: string;
+  /** When true, keep totalAmount as entered instead of service sum */
+  totalManual: boolean;
+  transactions: PaymentTransaction[];
 }
 
 export interface TripDocument {
@@ -419,6 +446,20 @@ export function defaultVisa(): TripVisa {
   };
 }
 
+export function defaultPaymentTransaction(): PaymentTransaction {
+  return {
+    id: "pay_txn_default_1",
+    amount: "",
+    currency: "PKR",
+    method: "",
+    reference: "",
+    paidAt: "",
+    notes: "",
+    documentId: "",
+    source: "manual",
+  };
+}
+
 export function defaultPayment(): TripPayment {
   return {
     totalAmount: "",
@@ -427,6 +468,8 @@ export function defaultPayment(): TripPayment {
     method: "",
     status: "unpaid",
     notes: "",
+    totalManual: false,
+    transactions: [],
   };
 }
 
@@ -459,6 +502,9 @@ export function defaultHotel(city: StayCity = "makkah"): TripHotel {
     breakfast: true,
     lunch: false,
     dinner: false,
+    cost: "",
+    currency: "PKR",
+    currencyOther: "",
     notes: "",
   };
 }
@@ -472,6 +518,9 @@ export function defaultTransport(): TripTransport {
     pickupDate: "",
     contactPerson: "",
     bookingRef: "",
+    cost: "",
+    currency: "PKR",
+    currencyOther: "",
     notes: "",
   };
 }

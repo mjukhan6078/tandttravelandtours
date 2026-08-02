@@ -7,6 +7,7 @@ import DashboardShell from "@/components/dashboard/DashboardShell";
 import FlightSegmentEditor from "@/components/dashboard/FlightSegmentEditor";
 import HotelsEditor from "@/components/dashboard/HotelsEditor";
 import ItineraryEditor, { ensureItinerary } from "@/components/dashboard/ItineraryEditor";
+import PaymentEditor from "@/components/dashboard/PaymentEditor";
 import TicketPassengersEditor from "@/components/dashboard/TicketPassengersEditor";
 import TripDocumentsPanel from "@/components/dashboard/TripDocumentsPanel";
 import VisasEditor from "@/components/dashboard/VisasEditor";
@@ -43,7 +44,6 @@ import {
   visaLineTotal,
 } from "@/lib/dashboard/ticket-pricing";
 import {
-  PAYMENT_STATUS_LABELS,
   TICKET_CURRENCY_OPTIONS,
   TRIP_STATUS_LABELS,
   defaultFlightSegment,
@@ -53,7 +53,6 @@ import {
   defaultVisa,
   type DocumentType,
   type FlightSegment,
-  type PaymentStatus,
   type TicketCurrency,
   type TicketPassenger,
   type TripHotel,
@@ -66,6 +65,7 @@ import {
   type TripVisa,
   type VisaRecord,
 } from "@/lib/dashboard/types";
+import { syncTripPaymentFromServices } from "@/lib/dashboard/payment";
 import { Copy, FileUp, KeyRound } from "lucide-react";
 
 function normalizeTicketState(incoming?: TripTicket | null): TripTicket {
@@ -180,7 +180,17 @@ export default function TripDetailPage() {
     setHotelPackage({ ...defaultHotelPackage(), ...(data.hotelPackage || {}) });
     setHotels(Array.isArray(data.hotels) ? data.hotels : []);
     setTransports(Array.isArray(data.transports) ? data.transports : []);
-    setPayment({ ...defaultPayment(), ...(data.payment || {}) });
+    setPayment(
+      syncTripPaymentFromServices(
+        { ...defaultPayment(), ...(data.payment || {}) },
+        {
+          ticket: normalizeTicketState(data.ticket),
+          visa: normalizeVisaState(data.visa),
+          hotels: Array.isArray(data.hotels) ? data.hotels : [],
+          transports: Array.isArray(data.transports) ? data.transports : [],
+        }
+      )
+    );
     setRevealedKey(data.apiKey || null);
   };
 
@@ -199,6 +209,12 @@ export default function TripDetailPage() {
   useEffect(() => {
     loadTrip();
   }, [loadTrip]);
+
+  useEffect(() => {
+    setPayment((current) =>
+      syncTripPaymentFromServices(current, { ticket, visa, hotels, transports })
+    );
+  }, [ticket, visa, hotels, transports]);
 
   const syncStaysToDates = (nextStart: string, nextEnd: string, currentStays: TripStay[]) => {
     const stays = ensureItinerary(currentStays);
@@ -259,7 +275,12 @@ export default function TripDetailPage() {
         hotelPackage,
         hotels,
         transports,
-        payment,
+        payment: syncTripPaymentFromServices(payment, {
+          ticket,
+          visa,
+          hotels,
+          transports,
+        }),
       }),
     });
     const data = await response.json();
@@ -1274,66 +1295,17 @@ export default function TripDetailPage() {
               <CardHeader>
                 <CardTitle>Payment</CardTitle>
               </CardHeader>
-              <CardContent className="space-y-6">
-                <div className="grid sm:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label>Total amount</Label>
-                    <Input
-                      value={payment.totalAmount}
-                      onChange={(e) => setPayment({ ...payment, totalAmount: e.target.value })}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Paid amount</Label>
-                    <Input
-                      value={payment.paidAmount}
-                      onChange={(e) => setPayment({ ...payment, paidAmount: e.target.value })}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Currency</Label>
-                    <Input
-                      value={payment.currency}
-                      onChange={(e) => setPayment({ ...payment, currency: e.target.value })}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Payment method</Label>
-                    <Input
-                      value={payment.method}
-                      onChange={(e) => setPayment({ ...payment, method: e.target.value })}
-                      placeholder="e.g. Bank transfer / Cash"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Payment status</Label>
-                    <Select
-                      value={payment.status}
-                      onValueChange={(v) =>
-                        setPayment({ ...payment, status: v as PaymentStatus })
-                      }
-                    >
-                      <SelectTrigger className="w-full">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {Object.entries(PAYMENT_STATUS_LABELS).map(([value, label]) => (
-                          <SelectItem key={value} value={value}>
-                            {label}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="space-y-2 sm:col-span-2">
-                    <Label>Payment notes</Label>
-                    <Textarea
-                      rows={2}
-                      value={payment.notes}
-                      onChange={(e) => setPayment({ ...payment, notes: e.target.value })}
-                    />
-                  </div>
-                </div>
+              <CardContent className="space-y-8 min-w-0">
+                <PaymentEditor
+                  payment={payment}
+                  onChange={setPayment}
+                  ticket={ticket}
+                  visa={visa}
+                  hotels={hotels}
+                  transports={transports}
+                  tripId={trip.id}
+                  onReceiptImported={loadTrip}
+                />
 
                 <TripDocumentsPanel
                   tripId={trip.id}

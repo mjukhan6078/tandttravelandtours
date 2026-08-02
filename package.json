@@ -10,6 +10,7 @@
     "ticket:parse": "tsx scripts/parse-ticket-cli.ts",
     "visa:parse": "tsx scripts/parse-visa-cli.ts",
     "hotel:parse": "tsx scripts/parse-hotel-cli.ts",
+    "payment:parse": "tsx scripts/parse-payment-cli.ts",
     "start": "npm run minio:ensure && node --env-file=.env .next/standalone/server.js",
     "start:next": "npm run minio:ensure && next start",
     "lint": "eslint"
