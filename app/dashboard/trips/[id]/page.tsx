@@ -328,8 +328,24 @@ export default function TripDetailPage() {
 
   const copyKey = async () => {
     if (!revealedKey) return;
-    await navigator.clipboard.writeText(revealedKey);
-    setMessage("API key copied");
+    try {
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(revealedKey);
+      } else {
+        const input = document.createElement("textarea");
+        input.value = revealedKey;
+        input.setAttribute("readonly", "");
+        input.style.position = "fixed";
+        input.style.left = "-9999px";
+        document.body.appendChild(input);
+        input.select();
+        document.execCommand("copy");
+        document.body.removeChild(input);
+      }
+      setMessage("API key copied");
+    } catch {
+      setError("Could not copy API key — select and copy it manually");
+    }
   };
 
   const deleteTrip = async () => {
