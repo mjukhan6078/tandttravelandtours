@@ -26,21 +26,6 @@ import {
   type FlightType,
 } from "@/lib/dashboard/types";
 
-function Section({
-  title,
-  children,
-}: {
-  title: string;
-  children: ReactNode;
-}) {
-  return (
-    <div className="space-y-3 rounded-lg border border-border bg-background p-3 sm:p-4">
-      <p className="text-sm font-medium text-foreground">{title}</p>
-      {children}
-    </div>
-  );
-}
-
 function Field({
   label,
   children,
@@ -166,7 +151,7 @@ export default function FlightSegmentEditor({
   const isConnecting = value.flightType === "connecting";
 
   return (
-    <div className="space-y-3 sm:space-y-4 rounded-lg border border-border bg-muted/10 p-3 sm:p-4">
+    <div className="space-y-4">
       {(title || hint) && (
         <div className="space-y-1">
           {title && <p className="text-sm font-medium text-foreground">{title}</p>}
@@ -174,234 +159,228 @@ export default function FlightSegmentEditor({
         </div>
       )}
 
-      <Section title="Airline & flight">
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          <Field label="Airline">
-            <Select
-              value={value.airline || undefined}
-              onValueChange={(airline) => patch({ airline })}
-            >
-              <SelectTrigger className="w-full">
-                <SelectValue placeholder="Select airline" />
-              </SelectTrigger>
-              <SelectContent>
-                {value.airline &&
-                  !AIRLINE_OPTIONS.some((option) => option.value === value.airline) && (
-                    <SelectItem value={value.airline}>{airlineLabel(value.airline)}</SelectItem>
-                  )}
-                {AIRLINE_OPTIONS.map((option) => (
-                  <SelectItem key={option.value} value={option.value}>
-                    {option.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </Field>
-          <Field label="Flight type">
-            <Select
-              value={value.flightType}
-              onValueChange={(flightType) => patch({ flightType: flightType as FlightType })}
-            >
-              <SelectTrigger className="w-full">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {Object.entries(FLIGHT_TYPE_LABELS).map(([optionValue, label]) => (
-                  <SelectItem key={optionValue} value={optionValue}>
-                    {label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </Field>
-          <Field label="Flight date">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <Field label="Airline">
+          <Select
+            value={value.airline || undefined}
+            onValueChange={(airline) => patch({ airline })}
+          >
+            <SelectTrigger className="w-full">
+              <SelectValue placeholder="Select airline" />
+            </SelectTrigger>
+            <SelectContent>
+              {value.airline &&
+                !AIRLINE_OPTIONS.some((option) => option.value === value.airline) && (
+                  <SelectItem value={value.airline}>{airlineLabel(value.airline)}</SelectItem>
+                )}
+              {AIRLINE_OPTIONS.map((option) => (
+                <SelectItem key={option.value} value={option.value}>
+                  {option.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </Field>
+        <Field label="Flight type">
+          <Select
+            value={value.flightType}
+            onValueChange={(flightType) => patch({ flightType: flightType as FlightType })}
+          >
+            <SelectTrigger className="w-full">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {Object.entries(FLIGHT_TYPE_LABELS).map(([optionValue, label]) => (
+                <SelectItem key={optionValue} value={optionValue}>
+                  {label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </Field>
+        <Field label="Flight date">
+          <Input
+            type="date"
+            value={value.flightDate || ""}
+            onChange={(e) => patch({ flightDate: e.target.value })}
+          />
+        </Field>
+        <Field label="Flight number">
+          <Input
+            value={value.flightNumber}
+            onChange={(e) => patch({ flightNumber: e.target.value })}
+            placeholder="e.g. FZ 336"
+          />
+        </Field>
+        {isConnecting && (
+          <Field label="Connecting flight number" className="sm:col-span-2">
             <Input
-              type="date"
-              value={value.flightDate || ""}
-              onChange={(e) => patch({ flightDate: e.target.value })}
+              value={value.connectingFlightNumber || ""}
+              onChange={(e) => patch({ connectingFlightNumber: e.target.value })}
+              placeholder="e.g. FZ 827"
             />
           </Field>
-          <Field label="Flight number">
-            <Input
-              value={value.flightNumber}
-              onChange={(e) => patch({ flightNumber: e.target.value })}
-              placeholder="e.g. FZ 336"
-            />
-          </Field>
-          {isConnecting && (
-            <Field label="Connecting flight number" className="sm:col-span-2">
-              <Input
-                value={value.connectingFlightNumber || ""}
-                onChange={(e) => patch({ connectingFlightNumber: e.target.value })}
-                placeholder="e.g. FZ 827"
-              />
-            </Field>
-          )}
-        </div>
-      </Section>
+        )}
+      </div>
 
-      <Section title="Route">
-        <div
-          className={
-            isConnecting
-              ? "grid grid-cols-1 lg:grid-cols-3 gap-3 items-stretch"
-              : "grid grid-cols-1 sm:grid-cols-2 gap-3 items-stretch"
-          }
-        >
-          <ColumnCard title="Departure">
+      <div
+        className={
+          isConnecting
+            ? "grid grid-cols-1 lg:grid-cols-3 gap-3 items-stretch"
+            : "grid grid-cols-1 sm:grid-cols-2 gap-3 items-stretch"
+        }
+      >
+        <ColumnCard title="Departure">
+          <Field label="Airport">
+            <AirportSelect
+              value={value.departureAirport}
+              onChange={(departureAirport) => patch({ departureAirport })}
+              placeholder="Select airport"
+            />
+          </Field>
+          <Field label="Time">
+            <Input
+              type="time"
+              value={value.departureTime || ""}
+              onChange={(e) => patch({ departureTime: e.target.value })}
+            />
+          </Field>
+          <Field label="Terminal">
+            <Input
+              value={value.departureTerminal || ""}
+              onChange={(e) => patch({ departureTerminal: e.target.value })}
+              placeholder="e.g. M"
+            />
+          </Field>
+        </ColumnCard>
+
+        {isConnecting && (
+          <ColumnCard title="Via">
             <Field label="Airport">
               <AirportSelect
-                value={value.departureAirport}
-                onChange={(departureAirport) => patch({ departureAirport })}
+                value={value.connectingAirport || ""}
+                onChange={(connectingAirport) => patch({ connectingAirport })}
                 placeholder="Select airport"
               />
             </Field>
-            <Field label="Time">
-              <Input
-                type="time"
-                value={value.departureTime || ""}
-                onChange={(e) => patch({ departureTime: e.target.value })}
-              />
-            </Field>
-            <Field label="Terminal">
-              <Input
-                value={value.departureTerminal || ""}
-                onChange={(e) => patch({ departureTerminal: e.target.value })}
-                placeholder="e.g. M"
-              />
-            </Field>
-          </ColumnCard>
 
-          {isConnecting && (
-            <ColumnCard title="Via">
-              <Field label="Airport">
-                <AirportSelect
-                  value={value.connectingAirport || ""}
-                  onChange={(connectingAirport) => patch({ connectingAirport })}
-                  placeholder="Select airport"
+            <div className="grid grid-cols-1 sm:grid-cols-[1fr_auto_1fr] gap-3">
+              <Field label="Arrive time">
+                <Input
+                  type="time"
+                  value={value.connectingArrivalTime || ""}
+                  onChange={(e) => updateViaArrival(e.target.value)}
                 />
               </Field>
+              <Field label="Layover" className="sm:w-[92px]">
+                <LayoverSelect
+                  value={value.connectingDuration}
+                  onChange={updateViaDuration}
+                  className="w-full"
+                />
+              </Field>
+              <Field label="Depart time">
+                <Input
+                  type="time"
+                  value={value.connectingDepartureTime || ""}
+                  onChange={(e) => updateViaDeparture(e.target.value)}
+                />
+              </Field>
+            </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-[1fr_auto_1fr] gap-3">
-                <Field label="Arrive time">
-                  <Input
-                    type="time"
-                    value={value.connectingArrivalTime || ""}
-                    onChange={(e) => updateViaArrival(e.target.value)}
-                  />
-                </Field>
-                <Field label="Layover" className="sm:w-[92px]">
-                  <LayoverSelect
-                    value={value.connectingDuration}
-                    onChange={updateViaDuration}
-                    className="w-full"
-                  />
-                </Field>
-                <Field label="Depart time">
-                  <Input
-                    type="time"
-                    value={value.connectingDepartureTime || ""}
-                    onChange={(e) => updateViaDeparture(e.target.value)}
-                  />
-                </Field>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <Field label="Arrive terminal">
-                  <Input
-                    value={value.connectingArrivalTerminal || ""}
-                    onChange={(e) => patch({ connectingArrivalTerminal: e.target.value })}
-                    placeholder="e.g. 2"
-                  />
-                </Field>
-                <Field label="Depart terminal">
-                  <Input
-                    value={value.connectingDepartureTerminal || ""}
-                    onChange={(e) => patch({ connectingDepartureTerminal: e.target.value })}
-                    placeholder="e.g. 2"
-                  />
-                </Field>
-              </div>
-            </ColumnCard>
-          )}
-
-          <ColumnCard title="Arrival">
-            <Field label="Airport">
-              <AirportSelect
-                value={value.arrivalAirport}
-                onChange={(arrivalAirport) => patch({ arrivalAirport })}
-                placeholder="Select airport"
-              />
-            </Field>
-            <Field label="Time">
-              <Input
-                type="time"
-                value={value.arrivalTime || ""}
-                onChange={(e) => patch({ arrivalTime: e.target.value })}
-              />
-            </Field>
-            <Field label="Terminal">
-              <Input
-                value={value.arrivalTerminal || ""}
-                onChange={(e) => patch({ arrivalTerminal: e.target.value })}
-                placeholder="e.g. 1"
-              />
-            </Field>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <Field label="Arrive terminal">
+                <Input
+                  value={value.connectingArrivalTerminal || ""}
+                  onChange={(e) => patch({ connectingArrivalTerminal: e.target.value })}
+                  placeholder="e.g. 2"
+                />
+              </Field>
+              <Field label="Depart terminal">
+                <Input
+                  value={value.connectingDepartureTerminal || ""}
+                  onChange={(e) => patch({ connectingDepartureTerminal: e.target.value })}
+                  placeholder="e.g. 2"
+                />
+              </Field>
+            </div>
           </ColumnCard>
-        </div>
-
-        {isConnecting && value.connectingStay && (
-          <p className="mt-3 text-sm text-muted-foreground rounded-md border border-border bg-muted/30 px-3 py-2.5 break-words leading-relaxed">
-            <span className="font-medium text-foreground">
-              {value.departureAirport || "—"}
-            </span>
-            {value.departureTime ? ` ${value.departureTime}` : ""}
-            {" → "}
-            <span className="font-medium text-foreground">{value.connectingStay}</span>
-            {value.connectingArrivalTime || value.connectingDepartureTime
-              ? ` (${value.connectingArrivalTime || "—"} → ${value.connectingDepartureTime || "—"})`
-              : ""}
-            {" → "}
-            <span className="font-medium text-foreground">
-              {value.arrivalAirport || "—"}
-            </span>
-            {value.arrivalTime ? ` ${value.arrivalTime}` : ""}
-          </p>
         )}
-      </Section>
 
-      <Section title="Status & services">
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          <Field label="Booking class">
-            <Input
-              value={value.bookingClass || ""}
-              onChange={(e) => patch({ bookingClass: e.target.value })}
-              placeholder="e.g. Y / Economy"
+        <ColumnCard title="Arrival">
+          <Field label="Airport">
+            <AirportSelect
+              value={value.arrivalAirport}
+              onChange={(arrivalAirport) => patch({ arrivalAirport })}
+              placeholder="Select airport"
             />
           </Field>
-          <Field label="Status">
+          <Field label="Time">
             <Input
-              value={value.status || ""}
-              onChange={(e) => patch({ status: e.target.value })}
-              placeholder="e.g. HK - Confirmed"
+              type="time"
+              value={value.arrivalTime || ""}
+              onChange={(e) => patch({ arrivalTime: e.target.value })}
             />
           </Field>
-          <Field label="Luggage allowance" className="sm:col-span-2">
+          <Field label="Terminal">
             <Input
-              value={value.luggageAllowance}
-              onChange={(e) => patch({ luggageAllowance: e.target.value })}
-              placeholder="e.g. 30kg"
+              value={value.arrivalTerminal || ""}
+              onChange={(e) => patch({ arrivalTerminal: e.target.value })}
+              placeholder="e.g. 1"
             />
           </Field>
-          <label className="flex items-center justify-between gap-3 rounded-md border border-border bg-muted/20 px-3 py-2.5 sm:col-span-2">
-            <span className="text-sm font-medium text-foreground">Meal included</span>
-            <Switch
-              checked={value.mealIncluded}
-              onCheckedChange={(checked) => patch({ mealIncluded: checked })}
-            />
-          </label>
-        </div>
-      </Section>
+        </ColumnCard>
+      </div>
+
+      {isConnecting && value.connectingStay && (
+        <p className="text-sm text-muted-foreground rounded-md border border-border bg-muted/30 px-3 py-2.5 break-words leading-relaxed">
+          <span className="font-medium text-foreground">
+            {value.departureAirport || "—"}
+          </span>
+          {value.departureTime ? ` ${value.departureTime}` : ""}
+          {" → "}
+          <span className="font-medium text-foreground">{value.connectingStay}</span>
+          {value.connectingArrivalTime || value.connectingDepartureTime
+            ? ` (${value.connectingArrivalTime || "—"} → ${value.connectingDepartureTime || "—"})`
+            : ""}
+          {" → "}
+          <span className="font-medium text-foreground">
+            {value.arrivalAirport || "—"}
+          </span>
+          {value.arrivalTime ? ` ${value.arrivalTime}` : ""}
+        </p>
+      )}
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <Field label="Booking class">
+          <Input
+            value={value.bookingClass || ""}
+            onChange={(e) => patch({ bookingClass: e.target.value })}
+            placeholder="e.g. Y / Economy"
+          />
+        </Field>
+        <Field label="Status">
+          <Input
+            value={value.status || ""}
+            onChange={(e) => patch({ status: e.target.value })}
+            placeholder="e.g. HK - Confirmed"
+          />
+        </Field>
+        <Field label="Luggage allowance" className="sm:col-span-2">
+          <Input
+            value={value.luggageAllowance}
+            onChange={(e) => patch({ luggageAllowance: e.target.value })}
+            placeholder="e.g. 30kg"
+          />
+        </Field>
+        <label className="flex items-center justify-between gap-3 rounded-md border border-border bg-muted/20 px-3 py-2.5 sm:col-span-2">
+          <span className="text-sm font-medium text-foreground">Meal included</span>
+          <Switch
+            checked={value.mealIncluded}
+            onCheckedChange={(checked) => patch({ mealIncluded: checked })}
+          />
+        </label>
+      </div>
     </div>
   );
 }
