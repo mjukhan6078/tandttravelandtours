@@ -10,6 +10,7 @@ import type {
   TripPayment,
   TripTicket,
   TripVisa,
+  VisaRecord,
   VisaStatus,
 } from "./types";
 import {
@@ -20,7 +21,11 @@ import {
   defaultVisa,
 } from "./types";
 import { formatConnectingStay } from "./connecting";
-import { normalizeTicketCurrency, syncSegmentTicketPrice } from "./ticket-pricing";
+import {
+  normalizeTicketCurrency,
+  syncSegmentTicketPrice,
+  syncVisaCost,
+} from "./ticket-pricing";
 
 function newHotelId() {
   return `hotel_${randomBytes(4).toString("hex")}`;
@@ -28,6 +33,10 @@ function newHotelId() {
 
 function newPassengerId() {
   return `pax_${randomBytes(4).toString("hex")}`;
+}
+
+function newVisaId() {
+  return `visa_${randomBytes(4).toString("hex")}`;
 }
 
 function asString(value: unknown) {
@@ -252,24 +261,88 @@ export function sanitizeTicket(input: unknown): TripTicket {
   };
 }
 
-export function sanitizeVisa(input: unknown): TripVisa {
-  const base = defaultVisa();
-  if (!input || typeof input !== "object") return base;
-  const row = input as Partial<TripVisa>;
+function sanitizeVisaRecord(input: unknown): VisaRecord | null {
+  if (!input || typeof input !== "object") return null;
+  const row = input as Partial<VisaRecord> & Record<string, unknown>;
   const statusOptions: VisaStatus[] = ["not_applied", "pending", "approved", "rejected"];
   const status = statusOptions.includes(row.status as VisaStatus)
     ? (row.status as VisaStatus)
     : "not_applied";
   return {
+    id: typeof row.id === "string" && row.id ? row.id : newVisaId(),
     status,
+    visaNumber: asString(row.visaNumber),
+    applicationNumber: asString(row.applicationNumber),
+    visaType: asString(row.visaType),
+    fullName: asString(row.fullName),
+    passportNumber: asString(row.passportNumber),
+    nationality: asString(row.nationality),
+    birthDate: asString(row.birthDate),
+    placeOfIssue: asString(row.placeOfIssue),
+    umrahOperator: asString(row.umrahOperator),
+    externalAgent: asString(row.externalAgent),
+    borderNumber: asString(row.borderNumber),
+    durationOfStay: asString(row.durationOfStay),
     vendor: asString(row.vendor),
-    cost: asString(row.cost),
-    currency: asString(row.currency) || "PKR",
-    transportIncluded: asBool(row.transportIncluded),
     validFrom: asString(row.validFrom),
     validTo: asString(row.validTo),
     notes: asString(row.notes),
   };
+}
+
+function legacyVisaToRecord(row: Record<string, unknown>): VisaRecord | null {
+  const hasDetail =
+    asString(row.visaNumber) ||
+    asString(row.fullName) ||
+    asString(row.passportNumber) ||
+    asString(row.applicationNumber);
+  if (!hasDetail && !asString(row.validFrom) && !asString(row.validTo)) {
+    return null;
+  }
+  return sanitizeVisaRecord(row);
+}
+
+export function sanitizeVisa(input: unknown): TripVisa {
+  const base = defaultVisa();
+  if (!input || typeof input !== "object") return base;
+  const row = input as Partial<TripVisa> & Record<string, unknown>;
+
+  let entries: VisaRecord[] = [];
+  if (Array.isArray(row.entries)) {
+    entries = row.entries
+      .map((item) => sanitizeVisaRecord(item))
+      .filter((item): item is VisaRecord => Boolean(item));
+  } else {
+    const legacy = legacyVisaToRecord(row);
+    if (legacy) entries = [legacy];
+  }
+
+  const currency = normalizeTicketCurrency(row.currency);
+  const knownCodes = new Set(TICKET_CURRENCY_OPTIONS.map((item) => item.value));
+  const rawCurrency = asString(row.currency).toUpperCase();
+  const currencyOther =
+    currency === "OTHER"
+      ? asString(row.currencyOther) ||
+        (rawCurrency && !knownCodes.has(rawCurrency as (typeof TICKET_CURRENCY_OPTIONS)[number]["value"])
+          ? asString(row.currency)
+          : "")
+      : "";
+  const unitsRaw = Number(row.units);
+  const units = Number.isFinite(unitsRaw)
+    ? Math.max(1, Math.min(50, Math.floor(unitsRaw)))
+    : Math.max(1, entries.length || 1);
+
+  return syncVisaCost({
+    ...base,
+    entries,
+    cost: asString(row.cost),
+    currency,
+    currencyOther,
+    units,
+    totalCost: asString(row.totalCost),
+    transportIncluded: asBool(row.transportIncluded),
+    notes: asString(row.notes),
+  });
 }
 
 export function sanitizeHotels(input: unknown): TripHotel[] {

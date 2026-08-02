@@ -9,6 +9,7 @@ import HotelsEditor from "@/components/dashboard/HotelsEditor";
 import ItineraryEditor, { ensureItinerary } from "@/components/dashboard/ItineraryEditor";
 import TicketPassengersEditor from "@/components/dashboard/TicketPassengersEditor";
 import TripDocumentsPanel from "@/components/dashboard/TripDocumentsPanel";
+import VisasEditor from "@/components/dashboard/VisasEditor";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -35,13 +36,15 @@ import {
   segmentHasFlightDetails,
   segmentLineTotal,
   syncSegmentTicketPrice,
+  syncVisaCost,
   ticketGrandTotal,
+  visaCurrencyLabel,
+  visaLineTotal,
 } from "@/lib/dashboard/ticket-pricing";
 import {
   PAYMENT_STATUS_LABELS,
   TICKET_CURRENCY_OPTIONS,
   TRIP_STATUS_LABELS,
-  VISA_STATUS_LABELS,
   defaultFlightSegment,
   defaultPayment,
   defaultTicket,
@@ -57,7 +60,7 @@ import {
   type TripStay,
   type TripTicket,
   type TripVisa,
-  type VisaStatus,
+  type VisaRecord,
 } from "@/lib/dashboard/types";
 import { Copy, FileUp, KeyRound } from "lucide-react";
 
@@ -144,6 +147,13 @@ export default function TripDetailPage() {
   const [error, setError] = useState("");
   const [revealedKey, setRevealedKey] = useState<string | null>(null);
   const [parsingTicket, setParsingTicket] = useState(false);
+  const [parsingVisa, setParsingVisa] = useState(false);
+
+  const normalizeVisaState = (incoming?: TripVisa | null): TripVisa =>
+    syncVisaCost({
+      ...defaultVisa(),
+      ...(incoming || {}),
+    });
 
   const applyTrip = (data: Trip) => {
     setTrip(data);
@@ -157,7 +167,7 @@ export default function TripDetailPage() {
     setStartDate(data.startDate || "");
     setEndDate(data.endDate || "");
     setTicket(normalizeTicketState(data.ticket));
-    setVisa({ ...defaultVisa(), ...(data.visa || {}) });
+    setVisa(normalizeVisaState(data.visa));
     setHotels(Array.isArray(data.hotels) ? data.hotels : []);
     setPayment({ ...defaultPayment(), ...(data.payment || {}) });
     setRevealedKey(data.apiKey || null);
@@ -330,6 +340,49 @@ export default function TripDetailPage() {
     }
 
     setMessage(`Ticket details loaded: ${data.parsed?.summary || "OK"}`);
+  };
+
+  const parseVisaPdf = async (file: File | null) => {
+    if (!trip || !file) return;
+    setParsingVisa(true);
+    setMessage("");
+    setError("");
+    const form = new FormData();
+    form.set("file", file);
+    const response = await fetch(`/api/dashboard/trips/${trip.id}/parse-visa`, {
+      method: "POST",
+      body: form,
+    });
+    const data = await response.json().catch(() => ({}));
+    setParsingVisa(false);
+    if (!response.ok) {
+      setError(data.error || "Could not parse visa PDF");
+      return;
+    }
+
+    const parsedRecord = data.parsed?.record as VisaRecord | undefined;
+    if (!parsedRecord) {
+      setError("No visa details found in PDF");
+      return;
+    }
+
+    const entries = [...(visa.entries || []), parsedRecord];
+    setVisa(
+      normalizeVisaState({
+        ...visa,
+        entries,
+      })
+    );
+
+    if (data.parsed?.clientNameHint && !clientName.trim()) {
+      setClientName(data.parsed.clientNameHint);
+    }
+
+    setMessage(`Visa added: ${data.parsed?.summary || "OK"}`);
+  };
+
+  const updateVisaEntries = (entries: VisaRecord[]) => {
+    setVisa(normalizeVisaState({ ...visa, entries }));
   };
 
   const updatePassengers = (passengers: TicketPassenger[]) => {
@@ -884,91 +937,164 @@ export default function TripDetailPage() {
               <CardHeader>
                 <CardTitle>Visa</CardTitle>
               </CardHeader>
-              <CardContent className="space-y-6">
-                <div className="grid sm:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label>Visa status</Label>
-                    <Select
-                      value={visa.status}
-                      onValueChange={(v) => setVisa({ ...visa, status: v as VisaStatus })}
-                    >
-                      <SelectTrigger className="w-full">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {Object.entries(VISA_STATUS_LABELS).map(([value, label]) => (
-                          <SelectItem key={value} value={value}>
-                            {label}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+              <CardContent className="space-y-8 min-w-0">
+                <section className="space-y-3 min-w-0">
+                  <div className="space-y-1">
+                    <Label className="text-base text-foreground">Import visa PDF</Label>
+                    <p className="text-xs text-muted-foreground">
+                      Each upload adds another visa card. Upload once per traveler.
+                    </p>
                   </div>
-                  <div className="space-y-2">
-                    <Label>Vendor applied with</Label>
-                    <Input
-                      value={visa.vendor}
-                      onChange={(e) => setVisa({ ...visa, vendor: e.target.value })}
-                      placeholder="e.g. Nusuk / agency name"
-                    />
+                  <div className="rounded-lg border border-dashed border-border bg-muted/20 p-3 sm:p-4">
+                    <div className="flex flex-wrap items-center justify-between gap-3">
+                      <p className="text-sm font-medium text-foreground flex items-center gap-2">
+                        <FileUp className="h-4 w-4 text-primary shrink-0" />
+                        Visa PDF
+                      </p>
+                      <Label
+                        htmlFor="visa-pdf-upload"
+                        className={`inline-flex items-center justify-center rounded-md border border-border bg-background px-3 py-2 text-sm font-medium cursor-pointer hover:bg-muted ${
+                          parsingVisa ? "opacity-60 pointer-events-none" : ""
+                        }`}
+                      >
+                        {parsingVisa ? "Reading PDF…" : "Choose PDF"}
+                      </Label>
+                      <Input
+                        id="visa-pdf-upload"
+                        type="file"
+                        accept="application/pdf,.pdf"
+                        className="hidden"
+                        disabled={parsingVisa}
+                        onChange={(e) => {
+                          const file = e.target.files?.[0] || null;
+                          void parseVisaPdf(file);
+                          e.currentTarget.value = "";
+                        }}
+                      />
+                    </div>
                   </div>
-                  <div className="space-y-2">
-                    <Label>Visa cost</Label>
-                    <Input
-                      value={visa.cost}
-                      onChange={(e) => setVisa({ ...visa, cost: e.target.value })}
-                      placeholder="e.g. 45000"
-                    />
+                </section>
+
+                <section className="space-y-3 min-w-0">
+                  <VisasEditor value={visa.entries || []} onChange={updateVisaEntries} />
+                </section>
+
+                <section className="space-y-3 min-w-0">
+                  <div className="space-y-1">
+                    <Label className="text-base text-foreground">Cost & extras</Label>
+                    <p className="text-xs text-muted-foreground">
+                      Unit price × visa count. Units follow the number of visa cards.
+                    </p>
                   </div>
-                  <div className="space-y-2">
-                    <Label>Currency</Label>
-                    <Input
-                      value={visa.currency}
-                      onChange={(e) => setVisa({ ...visa, currency: e.target.value })}
-                    />
+                  <div className="space-y-3 sm:space-y-4 rounded-lg border border-border bg-muted/10 p-3 sm:p-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-[minmax(0,1fr)_88px_minmax(0,1fr)] gap-3 items-end rounded-md border border-border bg-muted/20 p-3">
+                      <div className="space-y-1.5 min-w-0">
+                        <Label>Unit price</Label>
+                        <div className="flex min-w-0">
+                          <Input
+                            value={visa.cost}
+                            onChange={(e) =>
+                              setVisa(syncVisaCost({ ...visa, cost: e.target.value }))
+                            }
+                            placeholder="Price per visa"
+                            className="min-w-0 rounded-r-none"
+                          />
+                          <Select
+                            value={visa.currency || "PKR"}
+                            onValueChange={(currency) =>
+                              setVisa(
+                                syncVisaCost({
+                                  ...visa,
+                                  currency: currency as TicketCurrency,
+                                })
+                              )
+                            }
+                          >
+                            <SelectTrigger className="w-[96px] sm:w-[118px] shrink-0 rounded-l-none border-l-0">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {TICKET_CURRENCY_OPTIONS.map((option) => (
+                                <SelectItem key={option.value} value={option.value}>
+                                  {option.label}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        {visa.currency === "OTHER" && (
+                          <Input
+                            value={visa.currencyOther || ""}
+                            onChange={(e) =>
+                              setVisa(
+                                syncVisaCost({ ...visa, currencyOther: e.target.value })
+                              )
+                            }
+                            placeholder="Currency name / code"
+                            className="mt-2"
+                          />
+                        )}
+                      </div>
+                      <div className="space-y-1.5 min-w-0">
+                        <Label>Units</Label>
+                        <Input
+                          type="number"
+                          min={1}
+                          max={50}
+                          readOnly
+                          value={visa.entries?.length || visa.units || 1}
+                          title="Follows number of visa cards"
+                        />
+                      </div>
+                      <div className="space-y-1.5 min-w-0 sm:col-span-2 lg:col-span-1">
+                        <Label>Line total</Label>
+                        <div className="relative">
+                          <Input
+                            readOnly
+                            value={formatMoneyAmount(visaLineTotal(visa))}
+                            placeholder="Auto"
+                            className="pr-16"
+                          />
+                          <span className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-xs text-muted-foreground">
+                            {visaCurrencyLabel(visa)}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                    <label className="flex items-center justify-between gap-3 rounded-md border border-border bg-background px-3 py-2.5">
+                      <span className="text-sm font-medium text-foreground">
+                        Transport included with visa
+                      </span>
+                      <Switch
+                        checked={visa.transportIncluded}
+                        onCheckedChange={(checked) =>
+                          setVisa({ ...visa, transportIncluded: checked })
+                        }
+                      />
+                    </label>
                   </div>
-                  <div className="space-y-2">
-                    <Label>Valid from</Label>
-                    <Input
-                      type="date"
-                      value={visa.validFrom}
-                      onChange={(e) => setVisa({ ...visa, validFrom: e.target.value })}
-                    />
+                </section>
+
+                <section className="space-y-3 min-w-0">
+                  <div className="space-y-1">
+                    <Label className="text-base text-foreground">Notes & documents</Label>
                   </div>
-                  <div className="space-y-2">
-                    <Label>Valid to</Label>
-                    <Input
-                      type="date"
-                      value={visa.validTo}
-                      onChange={(e) => setVisa({ ...visa, validTo: e.target.value })}
-                    />
-                  </div>
-                  <label className="flex items-center justify-between gap-3 rounded-md border border-border px-3 py-2 sm:col-span-2">
-                    <span className="text-sm">Transport included with visa</span>
-                    <Switch
-                      checked={visa.transportIncluded}
-                      onCheckedChange={(checked) =>
-                        setVisa({ ...visa, transportIncluded: checked })
-                      }
-                    />
-                  </label>
-                  <div className="space-y-2 sm:col-span-2">
-                    <Label>Visa notes</Label>
+                  <div className="space-y-1.5">
+                    <Label>General visa notes</Label>
                     <Textarea
                       rows={2}
                       value={visa.notes}
                       onChange={(e) => setVisa({ ...visa, notes: e.target.value })}
                     />
                   </div>
-                </div>
-
-                <TripDocumentsPanel
-                  tripId={trip.id}
-                  type="visa"
-                  documents={trip.documents}
-                  onChanged={loadTrip}
-                  titlePlaceholder="e.g. Umrah visa copy"
-                />
+                  <TripDocumentsPanel
+                    tripId={trip.id}
+                    type="visa"
+                    documents={trip.documents}
+                    onChanged={loadTrip}
+                    titlePlaceholder="e.g. Umrah visa copy"
+                  />
+                </section>
 
                 <Button type="button" onClick={saveTrip} disabled={saving}>
                   {saving ? "Saving…" : "Save changes"}

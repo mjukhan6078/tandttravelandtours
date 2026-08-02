@@ -125,14 +125,50 @@ export interface TripTicket {
   notes: string;
 }
 
-export interface TripVisa {
+/** One traveler visa (MOFA / embassy details). */
+export interface VisaRecord {
+  id: string;
   status: VisaStatus;
+  /** MOFA / embassy visa number */
+  visaNumber: string;
+  applicationNumber: string;
+  /** e.g. Umrah */
+  visaType: string;
+  fullName: string;
+  passportNumber: string;
+  nationality: string;
+  /** YYYY-MM-DD */
+  birthDate: string;
+  /** e.g. Saudi Digital Embassy */
+  placeOfIssue: string;
+  umrahOperator: string;
+  externalAgent: string;
+  borderNumber: string;
+  /** e.g. 90 Days */
+  durationOfStay: string;
+  /** Agency / vendor applied with */
   vendor: string;
-  cost: string;
-  currency: string;
-  transportIncluded: boolean;
+  /** YYYY-MM-DD */
   validFrom: string;
+  /** YYYY-MM-DD */
   validTo: string;
+  notes: string;
+}
+
+/** Trip visa package: multiple records + shared pricing. */
+export interface TripVisa {
+  entries: VisaRecord[];
+  /** Price per visa (unit) */
+  cost: string;
+  /** Currency for visa cost */
+  currency: TicketCurrency;
+  /** Custom currency when currency is OTHER */
+  currencyOther: string;
+  /** Number of visas — follows entries count when present */
+  units: number;
+  /** Auto total: cost × units */
+  totalCost: string;
+  transportIncluded: boolean;
   notes: string;
 }
 
@@ -315,15 +351,38 @@ export function defaultTicket(): TripTicket {
   };
 }
 
-export function defaultVisa(): TripVisa {
+export function defaultVisaRecord(): VisaRecord {
   return {
+    id: `visa_${Math.random().toString(36).slice(2, 10)}`,
     status: "not_applied",
+    visaNumber: "",
+    applicationNumber: "",
+    visaType: "",
+    fullName: "",
+    passportNumber: "",
+    nationality: "",
+    birthDate: "",
+    placeOfIssue: "",
+    umrahOperator: "",
+    externalAgent: "",
+    borderNumber: "",
+    durationOfStay: "",
     vendor: "",
-    cost: "",
-    currency: "PKR",
-    transportIncluded: false,
     validFrom: "",
     validTo: "",
+    notes: "",
+  };
+}
+
+export function defaultVisa(): TripVisa {
+  return {
+    entries: [],
+    cost: "",
+    currency: "PKR",
+    currencyOther: "",
+    units: 1,
+    totalCost: "",
+    transportIncluded: false,
     notes: "",
   };
 }

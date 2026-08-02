@@ -336,7 +336,11 @@ export function toPublicTrip(trip: Trip, options?: { includeApiKey?: boolean }) 
     },
     visa: {
       ...normalized.visa,
-      approved: normalized.visa.status === "approved",
+      approved: normalized.visa.entries.some((entry) => entry.status === "approved"),
+      status:
+        normalized.visa.entries.find((entry) => entry.status === "approved")?.status ||
+        normalized.visa.entries[0]?.status ||
+        "not_applied",
     },
     hotels: normalized.hotels,
     payment: normalized.payment,

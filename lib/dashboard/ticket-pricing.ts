@@ -3,6 +3,7 @@ import {
   type FlightSegment,
   type TicketCurrency,
   type TripTicket,
+  type TripVisa,
 } from "./types";
 
 const CURRENCY_ALIASES: Record<string, TicketCurrency> = {
@@ -93,5 +94,43 @@ export function syncSegmentTicketPrice(segment: FlightSegment): FlightSegment {
     currency,
     currencyOther: currency === "OTHER" ? String(segment.currencyOther || "").trim() : "",
     ticketPrice: total > 0 ? String(total) : "",
+  };
+}
+
+export function visaLineTotal(visa: TripVisa | undefined | null): number {
+  if (!visa) return 0;
+  const unit = Number(visa.cost) || 0;
+  const units = Math.max(0, Math.floor(Number(visa.units) || 0));
+  return unit * units;
+}
+
+export function visaCurrencyLabel(visa: TripVisa | undefined | null): string {
+  if (!visa) return "PKR";
+  if (visa.currency === "OTHER") {
+    return visa.currencyOther?.trim() || "Other";
+  }
+  return visa.currency || "PKR";
+}
+
+export function syncVisaCost(visa: TripVisa): TripVisa {
+  const entryCount = Array.isArray(visa.entries) ? visa.entries.length : 0;
+  const units = Math.max(
+    1,
+    Math.min(
+      50,
+      Math.floor(entryCount > 0 ? entryCount : Number(visa.units) || 1)
+    )
+  );
+  const cost = String(visa.cost || "").trim();
+  const total = (Number(cost) || 0) * units;
+  const currency = normalizeTicketCurrency(visa.currency);
+  return {
+    ...visa,
+    entries: Array.isArray(visa.entries) ? visa.entries : [],
+    units,
+    cost,
+    currency,
+    currencyOther: currency === "OTHER" ? String(visa.currencyOther || "").trim() : "",
+    totalCost: total > 0 ? String(total) : "",
   };
 }
