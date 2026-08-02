@@ -1368,7 +1368,9 @@ Authorization: Bearer ${revealedKey || "<API_KEY>"}
 curl -H "X-API-Key: ${revealedKey || "<API_KEY>"}" \\
   ${origin}/api/v1/trip`}</pre>
                   <p className="text-xs text-muted-foreground">
-                    Document downloads:{" "}
+                    Response includes <code>summary</code>, ticket/visa/hotels/transports,
+                    payment with <code>serviceLines</code> + transactions, <code>costs</code>,
+                    and documents. Downloads:{" "}
                     <code>/api/v1/documents/&lt;documentId&gt;</code> with the same API key.
                   </p>
                 </div>

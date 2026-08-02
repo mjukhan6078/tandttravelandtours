@@ -2,6 +2,7 @@ import { randomBytes } from "crypto";
 import type {
   DashboardData,
   DocumentType,
+  FlightSegment,
   Trip,
   TripDocument,
   TripHotel,
@@ -13,7 +14,19 @@ import type {
   TripTransport,
   TripVisa,
 } from "./types";
-import { defaultHotelPackage, defaultPayment, defaultTicket, defaultVisa } from "./types";
+import {
+  DOCUMENT_TYPE_LABELS,
+  FLIGHT_TYPE_LABELS,
+  PAYMENT_STATUS_LABELS,
+  ROOM_OCCUPANCY_LABELS,
+  STAY_CITY_LABELS,
+  TRIP_STATUS_LABELS,
+  VISA_STATUS_LABELS,
+  defaultHotelPackage,
+  defaultPayment,
+  defaultTicket,
+  defaultVisa,
+} from "./types";
 import {
   META_KEY,
   deleteObject,
@@ -40,6 +53,53 @@ import {
   sanitizeTransports,
   sanitizeVisa,
 } from "./trip-details";
+import {
+  balanceDue,
+  buildPaymentServiceLines,
+  hotelLineTotal,
+  servicesTotalInPrimaryCurrency,
+  syncTripPaymentFromServices,
+  transportLineTotal,
+} from "./payment";
+import {
+  segmentCurrencyLabel,
+  segmentHasFlightDetails,
+  segmentLineTotal,
+  ticketGrandTotal,
+  visaCurrencyLabel,
+  visaLineTotal,
+} from "./ticket-pricing";
+
+function flightPublicSummary(segment: FlightSegment) {
+  const route = [
+    segment.departureAirport,
+    segment.flightType === "connecting" && segment.connectingAirport
+      ? `via ${segment.connectingAirport}`
+      : "",
+    segment.arrivalAirport,
+  ]
+    .filter(Boolean)
+    .join(" → ");
+
+  return {
+    ...segment,
+    flightTypeLabel: FLIGHT_TYPE_LABELS[segment.flightType] || segment.flightType,
+    route,
+    hasDetails: segmentHasFlightDetails(segment),
+    lineTotal: segment.ticketPrice || String(segmentLineTotal(segment) || ""),
+    currencyLabel: segmentCurrencyLabel(segment),
+  };
+}
+
+function documentCounts(documents: { type: DocumentType }[]) {
+  const counts = Object.fromEntries(
+    (Object.keys(DOCUMENT_TYPE_LABELS) as DocumentType[]).map((type) => [type, 0])
+  ) as Record<DocumentType, number>;
+  for (const doc of documents) {
+    if (doc.type in counts) counts[doc.type] += 1;
+  }
+  return counts;
+}
 
 async function readData(): Promise<DashboardData> {
   const raw = await getObjectText(META_KEY);
@@ -324,6 +384,66 @@ export function toPublicTrip(trip: Trip, options?: { includeApiKey?: boolean }) 
   const normalized = normalizeTrip(trip);
   const totals = stayTotals(normalized.itinerary);
   const schedule = buildStaySchedule(normalized.itinerary, normalized.startDate);
+  const endDate =
+    normalized.endDate || endDateFromItinerary(normalized.startDate, normalized.itinerary);
+
+  const ticketTotal = ticketGrandTotal(normalized.ticket);
+  const visaTotal = visaLineTotal(normalized.visa);
+  const hotelsTotal = normalized.hotels.reduce((sum, hotel) => sum + hotelLineTotal(hotel), 0);
+  const transportsTotal = normalized.transports.reduce(
+    (sum, row) => sum + transportLineTotal(row),
+    0
+  );
+
+  const serviceLines = buildPaymentServiceLines(normalized);
+  const serviceTotals = servicesTotalInPrimaryCurrency(serviceLines);
+  const payment = syncTripPaymentFromServices(normalized.payment, normalized);
+  const due = balanceDue(payment);
+
+  const hotels = normalized.hotels.map((hotel) => ({
+    ...hotel,
+    cityLabel: STAY_CITY_LABELS[hotel.city],
+    occupancyLabel: ROOM_OCCUPANCY_LABELS[hotel.occupancy],
+    meals: {
+      breakfast: hotel.breakfast,
+      lunch: hotel.lunch,
+      dinner: hotel.dinner,
+      summary: [
+        hotel.breakfast ? "Breakfast" : "",
+        hotel.lunch ? "Lunch" : "",
+        hotel.dinner ? "Dinner" : "",
+      ]
+        .filter(Boolean)
+        .join(", ") || "No meals",
+    },
+    lineTotal: hotel.cost || String(hotelLineTotal(hotel) || ""),
+    currencyLabel:
+      hotel.currency === "OTHER" ? hotel.currencyOther || "Other" : hotel.currency || "PKR",
+  }));
+
+  const transports = normalized.transports.map((row) => ({
+    ...row,
+    lineTotal: row.cost || String(transportLineTotal(row) || ""),
+    currencyLabel:
+      row.currency === "OTHER" ? row.currencyOther || "Other" : row.currency || "PKR",
+  }));
+
+  const documents = normalized.documents.map((doc) => ({
+    id: doc.id,
+    type: doc.type,
+    typeLabel: DOCUMENT_TYPE_LABELS[doc.type] || doc.type,
+    title: doc.title,
+    fileName: doc.fileName,
+    mimeType: doc.mimeType,
+    size: doc.size,
+    uploadedAt: doc.uploadedAt,
+    downloadUrl: `/api/v1/documents/${doc.id}`,
+  }));
+
+  const visaStatus =
+    normalized.visa.entries.find((entry) => entry.status === "approved")?.status ||
+    normalized.visa.entries[0]?.status ||
+    "not_applied";
 
   return {
     id: normalized.id,
@@ -332,7 +452,7 @@ export function toPublicTrip(trip: Trip, options?: { includeApiKey?: boolean }) 
     clientEmail: normalized.clientEmail,
     destination: normalized.destination,
     startDate: normalized.startDate,
-    endDate: normalized.endDate || endDateFromItinerary(normalized.startDate, normalized.itinerary),
+    endDate,
     itinerary: schedule,
     itinerarySummary: itinerarySummary(normalized.itinerary),
     makkahNights: totals.makkahNights,
@@ -340,43 +460,89 @@ export function toPublicTrip(trip: Trip, options?: { includeApiKey?: boolean }) 
     totalNights: totals.totalNights,
     notes: normalized.notes,
     status: normalized.status,
+    statusLabel: TRIP_STATUS_LABELS[normalized.status] || normalized.status,
+    summary: {
+      clientName: normalized.clientName,
+      destination: normalized.destination,
+      dates:
+        normalized.startDate && endDate
+          ? `${normalized.startDate} → ${endDate}`
+          : normalized.startDate || endDate || "",
+      itinerary: itinerarySummary(normalized.itinerary),
+      passengerCount: normalized.ticket.passengers.length,
+      visaCount: normalized.visa.entries.length,
+      hotelCount: normalized.hotels.length,
+      transportCount: normalized.transports.length,
+      paymentStatus: payment.status,
+      paymentStatusLabel: PAYMENT_STATUS_LABELS[payment.status],
+      totalAmount: payment.totalAmount,
+      paidAmount: payment.paidAmount,
+      balanceDue: due > 0 ? String(due) : "0",
+      currency: payment.currency,
+    },
     ticket: {
       ...normalized.ticket,
-      totalTicketPrice: String(
-        (Number(normalized.ticket.departure.ticketPrice) || 0) +
-          (Number(normalized.ticket.arrival.ticketPrice) || 0) || ""
-      ),
-      departure: {
-        ...normalized.ticket.departure,
-        lineTotal: normalized.ticket.departure.ticketPrice,
-      },
-      arrival: {
-        ...normalized.ticket.arrival,
-        lineTotal: normalized.ticket.arrival.ticketPrice,
-      },
+      passengerCount: normalized.ticket.passengers.length,
+      totalTicketPrice: ticketTotal > 0 ? String(ticketTotal) : "",
+      departure: flightPublicSummary(normalized.ticket.departure),
+      arrival: flightPublicSummary(normalized.ticket.arrival),
+      passengers: normalized.ticket.passengers,
     },
     visa: {
       ...normalized.visa,
+      entryCount: normalized.visa.entries.length,
       approved: normalized.visa.entries.some((entry) => entry.status === "approved"),
-      status:
-        normalized.visa.entries.find((entry) => entry.status === "approved")?.status ||
-        normalized.visa.entries[0]?.status ||
-        "not_applied",
+      status: visaStatus,
+      statusLabel: VISA_STATUS_LABELS[visaStatus] || visaStatus,
+      lineTotal: normalized.visa.totalCost || (visaTotal > 0 ? String(visaTotal) : ""),
+      currencyLabel: visaCurrencyLabel(normalized.visa),
+      entries: normalized.visa.entries.map((entry) => ({
+        ...entry,
+        statusLabel: VISA_STATUS_LABELS[entry.status] || entry.status,
+      })),
     },
     hotelPackage: normalized.hotelPackage,
-    hotels: normalized.hotels,
-    transports: normalized.transports,
-    payment: normalized.payment,
-    documents: normalized.documents.map((doc) => ({
-      id: doc.id,
-      type: doc.type,
-      title: doc.title,
-      fileName: doc.fileName,
-      mimeType: doc.mimeType,
-      size: doc.size,
-      uploadedAt: doc.uploadedAt,
-      downloadUrl: `/api/v1/documents/${doc.id}`,
-    })),
+    hotels,
+    hotelSummary: {
+      count: hotels.length,
+      totalNights: hotels.reduce((sum, hotel) => sum + (hotel.nights || 0), 0),
+      totalCost: hotelsTotal > 0 ? String(hotelsTotal) : "",
+    },
+    transports,
+    transportSummary: {
+      count: transports.length,
+      totalCost: transportsTotal > 0 ? String(transportsTotal) : "",
+    },
+    payment: {
+      ...payment,
+      statusLabel: PAYMENT_STATUS_LABELS[payment.status] || payment.status,
+      balanceDue: due > 0 ? String(due) : "0",
+      serviceLines,
+      serviceTotals: {
+        amount: serviceTotals.total > 0 ? String(serviceTotals.total) : "",
+        currency: serviceTotals.currency,
+        mixedCurrencies: serviceTotals.mixed,
+      },
+      transactionCount: payment.transactions.length,
+      transactions: payment.transactions.map((txn) => ({
+        ...txn,
+        receiptDownloadUrl: txn.documentId
+          ? `/api/v1/documents/${txn.documentId}`
+          : "",
+      })),
+    },
+    costs: {
+      tickets: ticketTotal > 0 ? String(ticketTotal) : "",
+      visas: visaTotal > 0 ? String(visaTotal) : "",
+      hotels: hotelsTotal > 0 ? String(hotelsTotal) : "",
+      transports: transportsTotal > 0 ? String(transportsTotal) : "",
+      currency: serviceTotals.currency,
+      packageTotal: payment.totalAmount,
+      paid: payment.paidAmount,
+      balanceDue: due > 0 ? String(due) : "0",
+    },
+    documents,
+    documentCounts: documentCounts(normalized.documents),
     apiKey: options?.includeApiKey ? normalized.apiKey : undefined,
     apiKeyCreatedAt: options?.includeApiKey ? normalized.apiKeyCreatedAt : undefined,
     createdAt: normalized.createdAt,
