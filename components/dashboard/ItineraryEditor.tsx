@@ -134,16 +134,16 @@ export default function ItineraryEditor({
   };
 
   return (
-    <div className="space-y-4 rounded-lg border border-border p-4 bg-muted/20">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
+    <div className="space-y-4 rounded-lg border border-border p-3 sm:p-4 bg-muted/20 min-w-0">
+      <div className="flex flex-col sm:flex-row sm:flex-wrap sm:items-start sm:justify-between gap-3">
+        <div className="min-w-0">
           <Label className="text-base">Trip stay order</Label>
           <p className="text-xs text-muted-foreground mt-1">
             Arrange city stays in order (e.g. Makkah → Madina → Makkah). Start/end dates set the
             total nights; stay nights fill that duration.
           </p>
         </div>
-        <Button type="button" variant="outline" size="sm" onClick={addStay}>
+        <Button type="button" variant="outline" size="sm" onClick={addStay} className="self-start">
           <Plus className="h-4 w-4 mr-1.5" />
           Add stay
         </Button>
@@ -190,9 +190,46 @@ export default function ItineraryEditor({
             return (
               <div
                 key={stay.id}
-                className="grid grid-cols-1 sm:grid-cols-[40px_minmax(140px,1fr)_minmax(180px,1.2fr)_88px_120px] gap-3 px-3 py-3 items-center"
+                className="grid grid-cols-1 sm:grid-cols-[40px_minmax(120px,1fr)_minmax(140px,1.2fr)_88px_120px] gap-3 px-3 py-3 items-center"
               >
-                <div className="text-sm font-semibold text-primary">{index + 1}.</div>
+                <div className="flex items-center justify-between gap-2 sm:block">
+                  <div className="text-sm font-semibold text-primary">{index + 1}.</div>
+                  <div className="flex items-center gap-0.5 sm:hidden">
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="h-9 w-9"
+                      onClick={() => moveStay(index, -1)}
+                      disabled={index === 0}
+                      aria-label="Move up"
+                    >
+                      <ArrowUp className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="h-9 w-9"
+                      onClick={() => moveStay(index, 1)}
+                      disabled={index === stays.length - 1}
+                      aria-label="Move down"
+                    >
+                      <ArrowDown className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="h-9 w-9 text-destructive"
+                      onClick={() => removeStay(stay.id)}
+                      disabled={stays.length <= 1}
+                      aria-label="Remove stay"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
 
                 <div className="min-w-0">
                   <Label className="sm:hidden mb-1.5 block">City</Label>
@@ -212,12 +249,12 @@ export default function ItineraryEditor({
 
                 <div className="min-w-0">
                   <Label className="sm:hidden mb-1.5 block">Dates</Label>
-                  <p className="text-sm text-muted-foreground truncate leading-9">
+                  <p className="text-sm text-muted-foreground break-words sm:truncate leading-snug sm:leading-9">
                     {range ? `${range.from} → ${range.to}` : "Set start date"}
                   </p>
                 </div>
 
-                <div>
+                <div className="min-w-0">
                   <Label className="sm:hidden mb-1.5 block">Nights</Label>
                   <Input
                     type="number"
@@ -233,7 +270,7 @@ export default function ItineraryEditor({
                   />
                 </div>
 
-                <div className="flex items-center justify-start sm:justify-end gap-0.5">
+                <div className="hidden sm:flex items-center justify-end gap-0.5">
                   <Button
                     type="button"
                     variant="ghost"

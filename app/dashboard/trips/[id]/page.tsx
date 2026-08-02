@@ -376,12 +376,15 @@ export default function TripDetailPage() {
     <DashboardShell
       title={clientName || trip.clientName}
       actions={
-        <div className="flex flex-wrap gap-2">
-          <Button asChild variant="outline" size="sm">
-            <Link href="/dashboard">All trips</Link>
+        <div className="flex items-center gap-1.5 sm:gap-2">
+          <Button asChild variant="outline" size="sm" className="px-2 sm:px-3">
+            <Link href="/dashboard">
+              <span className="sm:hidden">Trips</span>
+              <span className="hidden sm:inline">All trips</span>
+            </Link>
           </Button>
-          <Button size="sm" onClick={saveTrip} disabled={saving}>
-            {saving ? "Saving…" : "Save changes"}
+          <Button size="sm" onClick={saveTrip} disabled={saving} className="px-2 sm:px-3">
+            {saving ? "Saving…" : "Save"}
           </Button>
         </div>
       }
@@ -537,18 +540,18 @@ export default function TripDetailPage() {
               <CardHeader>
                 <CardTitle>Ticket</CardTitle>
               </CardHeader>
-              <CardContent className="space-y-8">
-                <section className="space-y-3">
+              <CardContent className="space-y-6 min-w-0">
+                <section className="space-y-3 min-w-0">
                   <div>
-                    <h3 className="text-sm font-semibold">1. Import</h3>
+                    <Label className="text-base">Import ticket PDF</Label>
                     <p className="text-xs text-muted-foreground mt-1">
                       Upload a Galileo e-ticket PDF to auto-fill booking, passengers, and flights.
                     </p>
                   </div>
-                  <div className="rounded-lg border border-dashed border-border bg-muted/20 p-4">
+                  <div className="rounded-lg border border-dashed border-border bg-muted/20 p-3 sm:p-4">
                     <div className="flex flex-wrap items-center justify-between gap-3">
-                      <p className="text-sm flex items-center gap-2">
-                        <FileUp className="h-4 w-4 text-secondary" />
+                      <p className="text-sm font-medium flex items-center gap-2">
+                        <FileUp className="h-4 w-4 text-secondary shrink-0" />
                         Ticket PDF
                       </p>
                       <Label
@@ -575,14 +578,14 @@ export default function TripDetailPage() {
                   </div>
                 </section>
 
-                <section className="space-y-3">
+                <section className="space-y-3 min-w-0">
                   <div>
-                    <h3 className="text-sm font-semibold">2. Booking details</h3>
+                    <Label className="text-base">Booking details</Label>
                     <p className="text-xs text-muted-foreground mt-1">
                       PNR, issue info, and payment form from the e-ticket.
                     </p>
                   </div>
-                  <div className="grid sm:grid-cols-2 gap-4 rounded-lg border border-border p-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 rounded-lg border border-border p-3 sm:p-4">
                     <div className="space-y-2">
                       <Label>GDS / Galileo PNR</Label>
                       <Input
@@ -639,19 +642,16 @@ export default function TripDetailPage() {
                   </div>
                 </section>
 
-                <section className="space-y-3">
-                  <div>
-                    <h3 className="text-sm font-semibold">3. Passengers</h3>
-                  </div>
+                <section className="space-y-3 min-w-0">
                   <TicketPassengersEditor
                     value={ticket.passengers || []}
                     onChange={updatePassengers}
                   />
                 </section>
 
-                <section className="space-y-3">
+                <section className="space-y-3 min-w-0">
                   <div>
-                    <h3 className="text-sm font-semibold">4. Departure flight</h3>
+                    <Label className="text-base">Departure flight</Label>
                     <p className="text-xs text-muted-foreground mt-1">
                       Outbound flight going to Saudi Arabia.
                     </p>
@@ -673,9 +673,9 @@ export default function TripDetailPage() {
                   />
                 </section>
 
-                <section className="space-y-3">
+                <section className="space-y-3 min-w-0">
                   <div>
-                    <h3 className="text-sm font-semibold">5. Return flight</h3>
+                    <Label className="text-base">Return flight</Label>
                     <p className="text-xs text-muted-foreground mt-1">
                       Return flight coming back — can differ from departure.
                     </p>
@@ -697,14 +697,14 @@ export default function TripDetailPage() {
                   />
                 </section>
 
-                <section className="space-y-3">
+                <section className="space-y-3 min-w-0">
                   <div>
-                    <h3 className="text-sm font-semibold">6. Pricing</h3>
+                    <Label className="text-base">Ticket pricing</Label>
                     <p className="text-xs text-muted-foreground mt-1">
                       Unit price × ticket units. Totals update automatically.
                     </p>
                   </div>
-                  <div className="space-y-4 rounded-lg border border-border p-4">
+                  <div className="space-y-3 sm:space-y-4 rounded-lg border border-border p-3 sm:p-4">
                     {(
                       [
                         ["departure", "Departure flight"],
@@ -720,13 +720,13 @@ export default function TripDetailPage() {
                       return (
                         <div
                           key={key}
-                          className={`grid sm:grid-cols-[1.2fr_1fr_100px_1fr] gap-3 items-end rounded-md border border-border p-3 ${
+                          className={`grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)_88px_minmax(0,1fr)] gap-3 items-end rounded-md border border-border p-3 ${
                             ready ? "bg-muted/20" : "bg-muted/10 opacity-70"
                           }`}
                         >
-                          <div className="space-y-1 min-w-0">
+                          <div className="space-y-1 min-w-0 sm:col-span-2 lg:col-span-1">
                             <Label>{label}</Label>
-                            <p className="text-xs text-muted-foreground truncate">
+                            <p className="text-xs text-muted-foreground break-words">
                               {ready
                                 ? [
                                     segment.airline,
@@ -740,15 +740,15 @@ export default function TripDetailPage() {
                                 : "Enter flight details above to price this flight"}
                             </p>
                           </div>
-                          <div className="space-y-2">
+                          <div className="space-y-2 min-w-0">
                             <Label>Unit price</Label>
-                            <div className="flex">
+                            <div className="flex min-w-0">
                               <Input
                                 disabled={!ready}
                                 value={segment.unitPrice}
                                 onChange={(e) => updateSegment({ unitPrice: e.target.value })}
                                 placeholder="Price per ticket"
-                                className="rounded-r-none"
+                                className="min-w-0 rounded-r-none"
                               />
                               <Select
                                 disabled={!ready}
@@ -757,7 +757,7 @@ export default function TripDetailPage() {
                                   updateSegment({ currency: currency as TicketCurrency })
                                 }
                               >
-                                <SelectTrigger className="w-[118px] rounded-l-none border-l-0">
+                                <SelectTrigger className="w-[96px] sm:w-[118px] shrink-0 rounded-l-none border-l-0">
                                   <SelectValue />
                                 </SelectTrigger>
                                 <SelectContent>
@@ -781,7 +781,7 @@ export default function TripDetailPage() {
                               />
                             )}
                           </div>
-                          <div className="space-y-2">
+                          <div className="space-y-2 min-w-0">
                             <Label>Units</Label>
                             <Input
                               type="number"
@@ -806,7 +806,7 @@ export default function TripDetailPage() {
                               placeholder="Qty"
                             />
                           </div>
-                          <div className="space-y-2">
+                          <div className="space-y-2 min-w-0 sm:col-span-2 lg:col-span-1">
                             <Label>Line total</Label>
                             <div className="relative">
                               <Input
@@ -851,11 +851,11 @@ export default function TripDetailPage() {
                   </div>
                 </section>
 
-                <section className="space-y-3">
+                <section className="space-y-3 min-w-0">
                   <div>
-                    <h3 className="text-sm font-semibold">7. Notes & documents</h3>
+                    <Label className="text-base">Notes & documents</Label>
                   </div>
-                  <div className="space-y-2 rounded-lg border border-border p-4">
+                  <div className="space-y-2">
                     <Label>Ticket notes</Label>
                     <Textarea
                       rows={2}

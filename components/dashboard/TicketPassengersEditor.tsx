@@ -20,15 +20,19 @@ export default function TicketPassengersEditor({
   };
 
   return (
-    <div className="space-y-4 rounded-lg border border-border bg-muted/20 p-4">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <p className="text-xs text-muted-foreground">
-          One card per passenger. Pricing units follow this count.
-        </p>
+    <div className="space-y-4">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="min-w-0">
+          <Label className="text-base">Passengers</Label>
+          <p className="text-xs text-muted-foreground mt-1">
+            One card per passenger. Pricing units follow this count.
+          </p>
+        </div>
         <Button
           type="button"
           variant="outline"
           size="sm"
+          className="shrink-0"
           onClick={() => onChange([...passengers, defaultTicketPassenger()])}
         >
           <Plus className="h-4 w-4 mr-1.5" />
@@ -37,28 +41,31 @@ export default function TicketPassengersEditor({
       </div>
 
       {passengers.length === 0 ? (
-        <p className="text-sm text-muted-foreground rounded-md border border-dashed border-border px-3 py-4">
+        <p className="text-sm text-muted-foreground rounded-lg border border-dashed border-border p-4">
           No passengers yet. Import a ticket PDF or add manually.
         </p>
       ) : (
-        <div className="space-y-3">
+        <div className="space-y-3 sm:space-y-4">
           {passengers.map((pax, index) => (
-            <div key={pax.id} className="rounded-md border border-border bg-background p-3 space-y-3">
+            <div
+              key={pax.id}
+              className="rounded-lg border border-border bg-muted/20 p-3 sm:p-4 space-y-3 sm:space-y-4 min-w-0"
+            >
               <div className="flex items-center justify-between gap-2">
-                <p className="text-sm font-medium text-primary">Passenger {index + 1}</p>
+                <p className="text-sm font-semibold text-primary">Passenger {index + 1}</p>
                 <Button
                   type="button"
                   variant="ghost"
                   size="icon"
-                  className="text-destructive"
+                  className="text-destructive shrink-0"
                   onClick={() => onChange(passengers.filter((item) => item.id !== pax.id))}
                   aria-label="Remove passenger"
                 >
                   <Trash2 className="h-4 w-4" />
                 </Button>
               </div>
-              <div className="grid sm:grid-cols-2 gap-3">
-                <div className="space-y-2 sm:col-span-2">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="space-y-2 min-w-0 sm:col-span-2">
                   <Label>Full name</Label>
                   <Input
                     value={pax.name}
@@ -66,7 +73,7 @@ export default function TicketPassengersEditor({
                     placeholder="Full name"
                   />
                 </div>
-                <div className="space-y-2">
+                <div className="space-y-2 min-w-0">
                   <Label>Ticket no.</Label>
                   <Input
                     value={pax.ticketNo}
@@ -74,14 +81,14 @@ export default function TicketPassengersEditor({
                     placeholder="e.g. 1414858016047-048"
                   />
                 </div>
-                <div className="space-y-2">
+                <div className="space-y-2 min-w-0">
                   <Label>Passport</Label>
                   <Input
                     value={pax.passport}
                     onChange={(e) => update(pax.id, { passport: e.target.value })}
                   />
                 </div>
-                <div className="space-y-2">
+                <div className="space-y-2 min-w-0">
                   <Label>Passport expiry</Label>
                   <Input
                     type="date"
@@ -89,7 +96,7 @@ export default function TicketPassengersEditor({
                     onChange={(e) => update(pax.id, { passportExpiry: e.target.value })}
                   />
                 </div>
-                <div className="space-y-2">
+                <div className="space-y-2 min-w-0">
                   <Label>Nationality</Label>
                   <Input
                     value={pax.nationality}

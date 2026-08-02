@@ -53,8 +53,8 @@ export default function HotelsEditor({
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
+      <div className="flex flex-col sm:flex-row sm:flex-wrap sm:items-start sm:justify-between gap-3">
+        <div className="min-w-0">
           <Label className="text-base">Hotels during trip</Label>
           <p className="text-xs text-muted-foreground mt-1">
             Add each hotel stay with nights, occupancy, distance, and meals.
@@ -64,6 +64,7 @@ export default function HotelsEditor({
           type="button"
           variant="outline"
           size="sm"
+          className="self-start"
           onClick={() =>
             onChange([
               ...hotels,
@@ -83,14 +84,17 @@ export default function HotelsEditor({
       ) : (
         <div className="space-y-4">
           {hotels.map((hotel, index) => (
-            <div key={hotel.id} className="rounded-lg border border-border bg-muted/20 p-4 space-y-4">
+            <div
+              key={hotel.id}
+              className="rounded-lg border border-border bg-muted/20 p-3 sm:p-4 space-y-3 sm:space-y-4 min-w-0"
+            >
               <div className="flex items-center justify-between gap-2">
                 <p className="text-sm font-semibold text-primary">Hotel {index + 1}</p>
                 <Button
                   type="button"
                   variant="ghost"
                   size="icon"
-                  className="text-destructive"
+                  className="text-destructive shrink-0"
                   onClick={() => onChange(hotels.filter((item) => item.id !== hotel.id))}
                   aria-label="Remove hotel"
                 >
@@ -98,7 +102,7 @@ export default function HotelsEditor({
                 </Button>
               </div>
 
-              <div className="grid sm:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
                 <div className="space-y-2 sm:col-span-2">
                   <Label>Hotel name</Label>
                   <Input

@@ -62,18 +62,20 @@ export default function DashboardHomePage() {
             <Card key={trip.id} className="border-primary/10 hover:shadow-md transition-shadow">
               <CardHeader className="pb-2">
                 <div className="flex items-start justify-between gap-3">
-                  <div>
-                    <CardTitle className="text-xl">{trip.clientName}</CardTitle>
-                    <p className="text-sm text-muted-foreground mt-1">
+                  <div className="min-w-0">
+                    <CardTitle className="text-lg sm:text-xl break-words">{trip.clientName}</CardTitle>
+                    <p className="text-sm text-muted-foreground mt-1 break-words">
                       {trip.destination || "Umrah"}
                       {trip.startDate ? ` · ${trip.startDate}` : ""}
                       {trip.endDate ? ` → ${trip.endDate}` : ""}
                     </p>
                     {trip.itinerarySummary && (
-                      <p className="text-sm text-foreground/80 mt-1">{trip.itinerarySummary}</p>
+                      <p className="text-sm text-foreground/80 mt-1 break-words">
+                        {trip.itinerarySummary}
+                      </p>
                     )}
                   </div>
-                  <span className="text-xs rounded-full bg-primary/10 text-primary px-2.5 py-1 font-medium">
+                  <span className="text-xs rounded-full bg-primary/10 text-primary px-2.5 py-1 font-medium shrink-0">
                     {TRIP_STATUS_LABELS[trip.status]}
                   </span>
                 </div>
