@@ -9,6 +9,7 @@
     "minio:ensure": "node scripts/ensure-minio-bucket.mjs",
     "ticket:parse": "tsx scripts/parse-ticket-cli.ts",
     "visa:parse": "tsx scripts/parse-visa-cli.ts",
+    "hotel:parse": "tsx scripts/parse-hotel-cli.ts",
     "start": "npm run minio:ensure && node --env-file=.env .next/standalone/server.js",
     "start:next": "npm run minio:ensure && next start",
     "lint": "eslint"

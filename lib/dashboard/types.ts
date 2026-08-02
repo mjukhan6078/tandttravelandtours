@@ -172,10 +172,26 @@ export interface TripVisa {
   notes: string;
 }
 
+/** Shared header fields from an Umrah hotel voucher PDF. */
+export interface TripHotelPackage {
+  voucherNumber: string;
+  saudiCompany: string;
+  partyName: string;
+  packageCategory: string;
+  /** YYYY-MM-DD */
+  issueDate: string;
+  notes: string;
+}
+
 export interface TripHotel {
   id: string;
   city: StayCity;
   hotelName: string;
+  /** Hotel / HN# from voucher */
+  hotelNumber: string;
+  reservationNumber: string;
+  rooms: number;
+  roomType: string;
   nights: number;
   checkIn: string;
   checkOut: string;
@@ -183,9 +199,23 @@ export interface TripHotel {
   occupancy: RoomOccupancy;
   /** Distance from Haram / landmark */
   distance: string;
+  contact: string;
   breakfast: boolean;
   lunch: boolean;
   dinner: boolean;
+  notes: string;
+}
+
+export interface TripTransport {
+  id: string;
+  /** Transport / TN# from voucher */
+  tnNumber: string;
+  service: string;
+  vehicle: string;
+  /** YYYY-MM-DD */
+  pickupDate: string;
+  contactPerson: string;
+  bookingRef: string;
   notes: string;
 }
 
@@ -226,7 +256,9 @@ export interface Trip {
   status: TripStatus;
   ticket: TripTicket;
   visa: TripVisa;
+  hotelPackage: TripHotelPackage;
   hotels: TripHotel[];
+  transports: TripTransport[];
   payment: TripPayment;
   documents: TripDocument[];
   apiKey: string | null;
@@ -242,7 +274,7 @@ export interface DashboardData {
 export const DOCUMENT_TYPE_LABELS: Record<DocumentType, string> = {
   visa: "Visa",
   ticket: "Ticket",
-  hotel: "Hotel booking",
+  hotel: "Hotel & transport",
   transport: "Transport",
   payment_receipt: "Payment receipt",
   other: "Other",
@@ -398,19 +430,48 @@ export function defaultPayment(): TripPayment {
   };
 }
 
+export function defaultHotelPackage(): TripHotelPackage {
+  return {
+    voucherNumber: "",
+    saudiCompany: "",
+    partyName: "",
+    packageCategory: "",
+    issueDate: "",
+    notes: "",
+  };
+}
+
 export function defaultHotel(city: StayCity = "makkah"): TripHotel {
   return {
     id: "hotel_default_1",
     city,
     hotelName: "",
+    hotelNumber: "",
+    reservationNumber: "",
+    rooms: 1,
+    roomType: "",
     nights: 1,
     checkIn: "",
     checkOut: "",
     occupancy: "separate",
     distance: "",
+    contact: "",
     breakfast: true,
     lunch: false,
     dinner: false,
+    notes: "",
+  };
+}
+
+export function defaultTransport(): TripTransport {
+  return {
+    id: "transport_default_1",
+    tnNumber: "",
+    service: "",
+    vehicle: "",
+    pickupDate: "",
+    contactPerson: "",
+    bookingRef: "",
     notes: "",
   };
 }

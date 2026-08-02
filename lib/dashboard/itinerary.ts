@@ -1,7 +1,21 @@
 import { randomBytes } from "crypto";
 import type { StayCity, Trip, TripStay } from "./types";
-import { STAY_CITY_LABELS, defaultItinerary, defaultPayment, defaultTicket, defaultVisa } from "./types";
-import { sanitizeHotels, sanitizePayment, sanitizeTicket, sanitizeVisa } from "./trip-details";
+import {
+  STAY_CITY_LABELS,
+  defaultHotelPackage,
+  defaultItinerary,
+  defaultPayment,
+  defaultTicket,
+  defaultVisa,
+} from "./types";
+import {
+  sanitizeHotelPackage,
+  sanitizeHotels,
+  sanitizePayment,
+  sanitizeTicket,
+  sanitizeTransports,
+  sanitizeVisa,
+} from "./trip-details";
 
 export function newStayId() {
   return `stay_${randomBytes(4).toString("hex")}`;
@@ -55,7 +69,9 @@ export function normalizeTrip(trip: Trip): Trip {
     madinaNights: totals.madinaNights,
     ticket: sanitizeTicket(trip.ticket ?? defaultTicket()),
     visa: sanitizeVisa(trip.visa ?? defaultVisa()),
+    hotelPackage: sanitizeHotelPackage(trip.hotelPackage ?? defaultHotelPackage()),
     hotels: sanitizeHotels(trip.hotels ?? []),
+    transports: sanitizeTransports(trip.transports ?? []),
     payment: sanitizePayment(trip.payment ?? defaultPayment()),
   };
 }

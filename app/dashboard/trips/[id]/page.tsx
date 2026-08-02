@@ -47,6 +47,7 @@ import {
   TICKET_CURRENCY_OPTIONS,
   TRIP_STATUS_LABELS,
   defaultFlightSegment,
+  defaultHotelPackage,
   defaultPayment,
   defaultTicket,
   defaultVisa,
@@ -56,10 +57,12 @@ import {
   type TicketCurrency,
   type TicketPassenger,
   type TripHotel,
+  type TripHotelPackage,
   type TripPayment,
   type TripStatus,
   type TripStay,
   type TripTicket,
+  type TripTransport,
   type TripVisa,
   type VisaRecord,
 } from "@/lib/dashboard/types";
@@ -116,7 +119,9 @@ type Trip = {
   status: TripStatus;
   ticket?: TripTicket;
   visa?: TripVisa;
+  hotelPackage?: TripHotelPackage;
   hotels?: TripHotel[];
+  transports?: TripTransport[];
   payment?: TripPayment;
   documents: TripDoc[];
   apiKey?: string | null;
@@ -140,7 +145,9 @@ export default function TripDetailPage() {
   const [endDate, setEndDate] = useState("");
   const [ticket, setTicket] = useState<TripTicket>(defaultTicket());
   const [visa, setVisa] = useState<TripVisa>(defaultVisa());
+  const [hotelPackage, setHotelPackage] = useState<TripHotelPackage>(defaultHotelPackage());
   const [hotels, setHotels] = useState<TripHotel[]>([]);
+  const [transports, setTransports] = useState<TripTransport[]>([]);
   const [payment, setPayment] = useState<TripPayment>(defaultPayment());
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -149,6 +156,7 @@ export default function TripDetailPage() {
   const [revealedKey, setRevealedKey] = useState<string | null>(null);
   const [parsingTicket, setParsingTicket] = useState(false);
   const [parsingVisa, setParsingVisa] = useState(false);
+  const [parsingHotel, setParsingHotel] = useState(false);
 
   const normalizeVisaState = (incoming?: TripVisa | null): TripVisa =>
     syncVisaCost({
@@ -169,7 +177,9 @@ export default function TripDetailPage() {
     setEndDate(data.endDate || "");
     setTicket(normalizeTicketState(data.ticket));
     setVisa(normalizeVisaState(data.visa));
+    setHotelPackage({ ...defaultHotelPackage(), ...(data.hotelPackage || {}) });
     setHotels(Array.isArray(data.hotels) ? data.hotels : []);
+    setTransports(Array.isArray(data.transports) ? data.transports : []);
     setPayment({ ...defaultPayment(), ...(data.payment || {}) });
     setRevealedKey(data.apiKey || null);
   };
@@ -246,7 +256,9 @@ export default function TripDetailPage() {
         status,
         ticket,
         visa,
+        hotelPackage,
         hotels,
+        transports,
         payment,
       }),
     });
@@ -382,6 +394,50 @@ export default function TripDetailPage() {
     setMessage(`Visa added: ${data.parsed?.summary || "OK"}`);
   };
 
+  const parseHotelPdf = async (file: File | null) => {
+    if (!trip || !file) return;
+    setParsingHotel(true);
+    setMessage("");
+    setError("");
+    const form = new FormData();
+    form.set("file", file);
+    const response = await fetch(`/api/dashboard/trips/${trip.id}/parse-hotel`, {
+      method: "POST",
+      body: form,
+    });
+    const data = await response.json().catch(() => ({}));
+    setParsingHotel(false);
+    if (!response.ok) {
+      setError(data.error || "Could not parse hotel voucher PDF");
+      return;
+    }
+
+    const parsedHotels = data.parsed?.hotels as TripHotel[] | undefined;
+    const parsedTransports = data.parsed?.transports as TripTransport[] | undefined;
+    const parsedPackage = data.parsed?.hotelPackage as TripHotelPackage | undefined;
+
+    if (
+      !parsedPackage &&
+      !(parsedHotels && parsedHotels.length) &&
+      !(parsedTransports && parsedTransports.length)
+    ) {
+      setError("No hotel or transport details found in PDF");
+      return;
+    }
+
+    if (parsedPackage) {
+      setHotelPackage({ ...defaultHotelPackage(), ...parsedPackage });
+    }
+    if (parsedHotels) setHotels(parsedHotels);
+    if (parsedTransports) setTransports(parsedTransports);
+
+    if (data.parsed?.clientNameHint && !clientName.trim()) {
+      setClientName(data.parsed.clientNameHint);
+    }
+
+    setMessage(`Hotel & transport loaded: ${data.parsed?.summary || "OK"}`);
+  };
+
   const updateVisaEntries = (entries: VisaRecord[]) => {
     setVisa(normalizeVisaState({ ...visa, entries }));
   };
@@ -456,7 +512,7 @@ export default function TripDetailPage() {
             <TabsTrigger value="duration">Trip duration</TabsTrigger>
             <TabsTrigger value="ticket">Ticket</TabsTrigger>
             <TabsTrigger value="visa">Visa</TabsTrigger>
-            <TabsTrigger value="hotel">Hotel</TabsTrigger>
+            <TabsTrigger value="hotel">Hotel & Transport</TabsTrigger>
             <TabsTrigger value="payment">Payment</TabsTrigger>
             <TabsTrigger value="api">API key</TabsTrigger>
           </TabsList>
@@ -1150,10 +1206,55 @@ export default function TripDetailPage() {
           <TabsContent value="hotel">
             <Card className="border-primary/10">
               <CardHeader>
-                <CardTitle>Hotel</CardTitle>
+                <CardTitle>Hotel & Transport</CardTitle>
               </CardHeader>
-              <CardContent className="space-y-6">
-                <HotelsEditor value={hotels} onChange={setHotels} />
+              <CardContent className="space-y-8 min-w-0">
+                <section className="space-y-3 min-w-0">
+                  <div className="space-y-1">
+                    <Label className="text-base text-foreground">Import hotel voucher PDF</Label>
+                    <p className="text-xs text-muted-foreground">
+                      Loads voucher details, hotel stays, and transport transfers into this tab.
+                    </p>
+                  </div>
+                  <div className="rounded-lg border border-dashed border-border bg-muted/20 p-3 sm:p-4">
+                    <div className="flex flex-wrap items-center justify-between gap-3">
+                      <p className="text-sm font-medium text-foreground flex items-center gap-2">
+                        <FileUp className="h-4 w-4 text-primary shrink-0" />
+                        Hotel voucher PDF
+                      </p>
+                      <Label
+                        htmlFor="hotel-pdf-upload"
+                        className={`inline-flex items-center justify-center rounded-md border border-border bg-background px-3 py-2 text-sm font-medium cursor-pointer hover:bg-muted ${
+                          parsingHotel ? "opacity-60 pointer-events-none" : ""
+                        }`}
+                      >
+                        {parsingHotel ? "Reading PDF…" : "Choose PDF"}
+                      </Label>
+                      <Input
+                        id="hotel-pdf-upload"
+                        type="file"
+                        accept="application/pdf,.pdf"
+                        className="hidden"
+                        disabled={parsingHotel}
+                        onChange={(e) => {
+                          const file = e.target.files?.[0] || null;
+                          void parseHotelPdf(file);
+                          e.currentTarget.value = "";
+                        }}
+                      />
+                    </div>
+                  </div>
+                </section>
+
+                <HotelsEditor
+                  hotelPackage={hotelPackage}
+                  onPackageChange={setHotelPackage}
+                  hotels={hotels}
+                  onHotelsChange={setHotels}
+                  transports={transports}
+                  onTransportsChange={setTransports}
+                />
+
                 <TripDocumentsPanel
                   tripId={trip.id}
                   type="hotel"

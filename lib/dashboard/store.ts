@@ -5,13 +5,15 @@ import type {
   Trip,
   TripDocument,
   TripHotel,
+  TripHotelPackage,
   TripPayment,
   TripStatus,
   TripStay,
   TripTicket,
+  TripTransport,
   TripVisa,
 } from "./types";
-import { defaultPayment, defaultTicket, defaultVisa } from "./types";
+import { defaultHotelPackage, defaultPayment, defaultTicket, defaultVisa } from "./types";
 import {
   META_KEY,
   deleteObject,
@@ -30,7 +32,14 @@ import {
   stayTotals,
 } from "./itinerary";
 import { fitItineraryToNights, nightsBetween } from "./duration";
-import { sanitizeHotels, sanitizePayment, sanitizeTicket, sanitizeVisa } from "./trip-details";
+import {
+  sanitizeHotelPackage,
+  sanitizeHotels,
+  sanitizePayment,
+  sanitizeTicket,
+  sanitizeTransports,
+  sanitizeVisa,
+} from "./trip-details";
 
 async function readData(): Promise<DashboardData> {
   const raw = await getObjectText(META_KEY);
@@ -93,7 +102,9 @@ export type CreateTripInput = {
   status?: TripStatus;
   ticket?: TripTicket;
   visa?: TripVisa;
+  hotelPackage?: TripHotelPackage;
   hotels?: TripHotel[];
+  transports?: TripTransport[];
   payment?: TripPayment;
 };
 
@@ -148,7 +159,9 @@ export async function createTrip(input: CreateTripInput) {
     status: input.status || "draft",
     ticket: sanitizeTicket(input.ticket ?? defaultTicket()),
     visa: sanitizeVisa(input.visa ?? defaultVisa()),
+    hotelPackage: sanitizeHotelPackage(input.hotelPackage ?? defaultHotelPackage()),
     hotels: sanitizeHotels(input.hotels ?? []),
+    transports: sanitizeTransports(input.transports ?? []),
     payment: sanitizePayment(input.payment ?? defaultPayment()),
     documents: [],
     apiKey: null,
@@ -196,7 +209,15 @@ export async function updateTrip(id: string, patch: Partial<CreateTripInput>) {
     status: patch.status ?? current.status,
     ticket: patch.ticket !== undefined ? sanitizeTicket(patch.ticket) : current.ticket,
     visa: patch.visa !== undefined ? sanitizeVisa(patch.visa) : current.visa,
+    hotelPackage:
+      patch.hotelPackage !== undefined
+        ? sanitizeHotelPackage(patch.hotelPackage)
+        : current.hotelPackage,
     hotels: patch.hotels !== undefined ? sanitizeHotels(patch.hotels) : current.hotels,
+    transports:
+      patch.transports !== undefined
+        ? sanitizeTransports(patch.transports)
+        : current.transports,
     payment: patch.payment !== undefined ? sanitizePayment(patch.payment) : current.payment,
     updatedAt: nowIso(),
   };
@@ -342,7 +363,9 @@ export function toPublicTrip(trip: Trip, options?: { includeApiKey?: boolean }) 
         normalized.visa.entries[0]?.status ||
         "not_applied",
     },
+    hotelPackage: normalized.hotelPackage,
     hotels: normalized.hotels,
+    transports: normalized.transports,
     payment: normalized.payment,
     documents: normalized.documents.map((doc) => ({
       id: doc.id,

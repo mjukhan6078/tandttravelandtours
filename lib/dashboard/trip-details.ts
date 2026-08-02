@@ -7,8 +7,10 @@ import type {
   StayCity,
   TicketPassenger,
   TripHotel,
+  TripHotelPackage,
   TripPayment,
   TripTicket,
+  TripTransport,
   TripVisa,
   VisaRecord,
   VisaStatus,
@@ -16,6 +18,7 @@ import type {
 import {
   TICKET_CURRENCY_OPTIONS,
   defaultFlightSegment,
+  defaultHotelPackage,
   defaultPayment,
   defaultTicket,
   defaultVisa,
@@ -29,6 +32,10 @@ import {
 
 function newHotelId() {
   return `hotel_${randomBytes(4).toString("hex")}`;
+}
+
+function newTransportId() {
+  return `transport_${randomBytes(4).toString("hex")}`;
 }
 
 function newPassengerId() {
@@ -345,6 +352,20 @@ export function sanitizeVisa(input: unknown): TripVisa {
   });
 }
 
+export function sanitizeHotelPackage(input: unknown): TripHotelPackage {
+  const base = defaultHotelPackage();
+  if (!input || typeof input !== "object") return base;
+  const row = input as Partial<TripHotelPackage>;
+  return {
+    voucherNumber: asString(row.voucherNumber),
+    saudiCompany: asString(row.saudiCompany),
+    partyName: asString(row.partyName),
+    packageCategory: asString(row.packageCategory),
+    issueDate: asString(row.issueDate),
+    notes: asString(row.notes),
+  };
+}
+
 export function sanitizeHotels(input: unknown): TripHotel[] {
   if (!Array.isArray(input)) return [];
   return input
@@ -357,11 +378,16 @@ export function sanitizeHotels(input: unknown): TripHotel[] {
         id: typeof row.id === "string" && row.id ? row.id : newHotelId(),
         city,
         hotelName: asString(row.hotelName),
+        hotelNumber: asString(row.hotelNumber),
+        reservationNumber: asString(row.reservationNumber),
+        rooms: Math.max(1, Math.min(20, Number(row.rooms) || 1)),
+        roomType: asString(row.roomType),
         nights: Math.max(1, Math.min(60, Number(row.nights) || 1)),
         checkIn: asString(row.checkIn),
         checkOut: asString(row.checkOut),
         occupancy,
         distance: asString(row.distance),
+        contact: asString(row.contact),
         breakfast: asBool(row.breakfast),
         lunch: asBool(row.lunch),
         dinner: asBool(row.dinner),
@@ -369,6 +395,26 @@ export function sanitizeHotels(input: unknown): TripHotel[] {
       } satisfies TripHotel;
     })
     .filter((item): item is TripHotel => Boolean(item));
+}
+
+export function sanitizeTransports(input: unknown): TripTransport[] {
+  if (!Array.isArray(input)) return [];
+  return input
+    .map((item) => {
+      if (!item || typeof item !== "object") return null;
+      const row = item as Partial<TripTransport>;
+      return {
+        id: typeof row.id === "string" && row.id ? row.id : newTransportId(),
+        tnNumber: asString(row.tnNumber),
+        service: asString(row.service),
+        vehicle: asString(row.vehicle),
+        pickupDate: asString(row.pickupDate),
+        contactPerson: asString(row.contactPerson),
+        bookingRef: asString(row.bookingRef),
+        notes: asString(row.notes),
+      } satisfies TripTransport;
+    })
+    .filter((item): item is TripTransport => Boolean(item));
 }
 
 export function sanitizePayment(input: unknown): TripPayment {
