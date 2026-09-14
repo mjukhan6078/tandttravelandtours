@@ -148,7 +148,7 @@ export default function InquiryForm({
       <Button
         type="submit"
         disabled={status === "loading"}
-        className="w-full bg-primary text-primary-foreground hover:bg-[#0c3270] px-6 py-3 h-auto"
+        className="w-full bg-primary text-primary-foreground hover:bg-[var(--primary-hover)] px-6 py-3 h-auto"
       >
         {status === "loading" ? "Sending…" : "Submit"}
       </Button>

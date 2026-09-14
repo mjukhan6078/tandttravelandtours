@@ -38,7 +38,7 @@ export function ComingSoon({
       <section className="mx-auto max-w-[720px] px-4 py-16 text-center">
         <p className="mb-8 text-muted-foreground">{description}</p>
         <div className="flex flex-wrap items-center justify-center gap-3">
-          <Button asChild className="bg-primary hover:bg-[#0c3270] uppercase">
+          <Button asChild className="bg-primary hover:bg-[var(--primary-hover)] uppercase">
             <Link href="/contact-us">Contact Us</Link>
           </Button>
           <Button

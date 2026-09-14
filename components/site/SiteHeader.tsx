@@ -42,14 +42,14 @@ export default function SiteHeader() {
         scrolled && "shadow-lg"
       )}
     >
-      <div className="mx-auto flex max-w-[1170px] items-center justify-between gap-4 px-4 py-2.5">
-        <Link href="/" className="flex items-center gap-2 shrink-0 rounded-sm bg-white/95 px-2 py-1">
+      <div className="mx-auto flex max-w-[1170px] items-center justify-between gap-4 px-4 py-2">
+        <Link href="/" className="flex shrink-0 items-center" aria-label={SITE_NAME}>
           <Image
             src="/images/logo.png"
             alt={SITE_NAME}
-            width={48}
-            height={48}
-            className="h-11 w-auto object-contain"
+            width={220}
+            height={96}
+            className="h-12 w-auto object-contain sm:h-14"
             priority
           />
         </Link>
@@ -68,7 +68,7 @@ export default function SiteHeader() {
                       <li key={child.href}>
                         <Link
                           href={child.href}
-                          className="block px-4 py-2 text-xs font-semibold uppercase tracking-wide text-white/90 hover:bg-[#0c3270] hover:text-white"
+                          className="block px-4 py-2 text-xs font-semibold uppercase tracking-wide text-white/90 hover:bg-[var(--primary-hover)] hover:text-white"
                         >
                           {child.label}
                         </Link>

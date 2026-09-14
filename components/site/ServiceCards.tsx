@@ -29,7 +29,7 @@ export default function ServiceCards() {
                 </p>
                 <Button
                   asChild
-                  className="w-fit bg-primary hover:bg-[#0c3270] uppercase text-xs"
+                  className="w-fit bg-primary hover:bg-[var(--primary-hover)] uppercase text-xs"
                 >
                   <Link href={card.href}>Get a Quote</Link>
                 </Button>

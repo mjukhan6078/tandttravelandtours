@@ -29,7 +29,6 @@ export const journeys = [
   { title: "Hajj", href: "/hajj-packages-2026", blurb: "Hajj packages and guidance" },
   { title: "Umrah", href: "/services", blurb: "Umrah packages and support" },
   { title: "International", href: "/get-a-quote", blurb: "International travel planning" },
-  { title: "Guest House", href: "/gallery/guest-house", blurb: "Guest house options" },
   { title: "Domestic Tours", href: "/get-a-quote", blurb: "Domestic tour arrangements" },
   { title: "Visa Services", href: "/services", blurb: "Hassle-free visa assistance" },
 ];
@@ -78,13 +77,6 @@ export const services = [
     title: "Transport",
     description: "Airport transfers and comfortable city-to-city transport",
   },
-];
-
-export const galleryPreview = [
-  { title: "Hajj Gallery", href: "/gallery/hajj" },
-  { title: "Hajj Tarbiati", href: "/gallery/hajj-tarbiati" },
-  { title: "Makkah & Madinah", href: "/gallery/makkah-madinah" },
-  { title: "Guest House", href: "/gallery/guest-house" },
 ];
 
 export const testimonials = [

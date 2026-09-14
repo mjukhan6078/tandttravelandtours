@@ -1,43 +1,50 @@
 import Link from "next/link";
+import Image from "next/image";
 import AnimatedSection from "@/components/AnimatedSection";
 import { Button } from "@/components/ui/button";
 import {
   ADDRESS,
   EMAIL,
+  SITE_NAME,
   WHATSAPP_DISPLAY,
   WHATSAPP_URL,
 } from "@/lib/site/contact";
 
 export default function HomeHero() {
   return (
-    <section className="relative overflow-hidden border-b border-border bg-[#f9f9f9] px-4 py-16 md:py-24">
+    <section className="relative overflow-hidden border-b border-border bg-black px-4 py-16 md:py-24">
       <div
-        className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_top,_rgba(16,64,144,0.12),_transparent_55%)]"
+        className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_top,_rgba(201,162,39,0.22),_transparent_55%)]"
         aria-hidden
       />
       <div className="relative mx-auto max-w-[1170px] text-center">
         <AnimatedSection>
-          <p className="mb-3 text-sm font-semibold uppercase tracking-[0.2em] text-secondary">
-            T&T Travel and Tours
-          </p>
-          <h1 className="font-heading text-3xl font-bold uppercase tracking-wide text-primary md:text-5xl">
+          <Image
+            src="/images/logo.png"
+            alt={SITE_NAME}
+            width={480}
+            height={208}
+            className="mx-auto mb-8 h-24 w-auto object-contain sm:h-28 md:h-36"
+            priority
+          />
+          <h1 className="font-heading text-3xl font-bold uppercase tracking-wide text-white md:text-5xl">
             Your Trusted Travel Partner
           </h1>
-          <p className="mx-auto mt-4 max-w-2xl text-base text-muted-foreground md:text-lg">
+          <p className="mx-auto mt-4 max-w-2xl text-base text-white/75 md:text-lg">
             Plan your sacred Umrah and Hajj journey with care — flights, hotels,
             visa, ziaraat, and transport from Karachi.
           </p>
           <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
             <Button
               asChild
-              className="bg-primary px-6 py-3 h-auto uppercase hover:bg-[#0c3270]"
+              className="bg-primary px-6 py-3 h-auto uppercase text-primary-foreground hover:bg-[var(--primary-hover)]"
             >
               <Link href="/get-a-quote">Get a Quote</Link>
             </Button>
             <Button
               asChild
               variant="outline"
-              className="border-primary px-6 py-3 h-auto uppercase text-primary hover:bg-primary hover:text-primary-foreground"
+              className="border-white/40 bg-transparent px-6 py-3 h-auto uppercase text-white hover:bg-white/10"
             >
               <Link href="/contact-us">Contact Us</Link>
             </Button>
@@ -78,7 +85,7 @@ export function ContactStrip() {
             </p>
           </div>
           <div className="mt-8 flex flex-wrap justify-center gap-3">
-            <Button asChild className="bg-primary uppercase hover:bg-[#0c3270]">
+            <Button asChild className="bg-primary uppercase hover:bg-[var(--primary-hover)]">
               <Link href="/contact-us">Contact Form</Link>
             </Button>
             <Button

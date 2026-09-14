@@ -2,7 +2,6 @@ import Link from "next/link";
 import {
   Bus,
   FileText,
-  Home,
   Landmark,
   MoonStar,
   Plane,
@@ -11,7 +10,7 @@ import {
 import AnimatedSection from "@/components/AnimatedSection";
 import { journeys } from "@/lib/site/content";
 
-const icons: LucideIcon[] = [Landmark, MoonStar, Plane, Home, Bus, FileText];
+const icons: LucideIcon[] = [Landmark, MoonStar, Plane, Bus, FileText];
 
 export default function JourneyGrid() {
   return (
@@ -27,7 +26,7 @@ export default function JourneyGrid() {
             </p>
           </div>
         </AnimatedSection>
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
           {journeys.map((item, idx) => {
             const Icon = icons[idx % icons.length];
             return (

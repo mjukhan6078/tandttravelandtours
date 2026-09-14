@@ -20,17 +20,16 @@ export default function SiteFooter() {
     <footer className="border-t border-border bg-white text-[#666]">
       <div className="mx-auto grid max-w-[1170px] gap-10 px-4 py-12 md:grid-cols-3">
         <div>
-          <div className="mb-4 flex items-center gap-3">
-            <Image
-              src="/images/logo.png"
-              alt={SITE_NAME}
-              width={56}
-              height={56}
-              className="h-14 w-auto object-contain"
-            />
-            <span className="font-heading text-base font-bold uppercase text-primary">
-              {SITE_NAME}
-            </span>
+          <div className="mb-4">
+            <Link href="/" className="inline-block" aria-label={SITE_NAME}>
+              <Image
+                src="/images/logo.png"
+                alt={SITE_NAME}
+                width={240}
+                height={104}
+                className="h-16 w-auto object-contain"
+              />
+            </Link>
           </div>
           <p className="text-sm leading-relaxed">
             Trusted Umrah planning — flights, hotels, visa, ziaraat, and transport.
