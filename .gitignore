@@ -40,7 +40,6 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 
-# dashboard local data / uploads
-/data/dashboard.json
-/data/uploads/
-!/data/.gitkeep
+# inquiry store (local)
+.data/
+.data/inquiries.json

@@ -2,22 +2,17 @@ import { cpSync, existsSync, mkdirSync } from "fs";
 import { join } from "path";
 
 const root = process.cwd();
-const standalone = join(root, ".next", "standalone");
-const standaloneNext = join(standalone, ".next");
+const standalone = join(root, ".next/standalone");
 
 if (!existsSync(standalone)) {
-  console.error("Standalone build not found. Run next build first.");
-  process.exit(1);
+  console.warn("No .next/standalone directory; skip copy.");
+  process.exit(0);
 }
 
-mkdirSync(standaloneNext, { recursive: true });
-
-cpSync(join(root, ".next", "static"), join(standaloneNext, "static"), {
+cpSync(join(root, "public"), join(standalone, "public"), { recursive: true });
+mkdirSync(join(standalone, ".next"), { recursive: true });
+cpSync(join(root, ".next/static"), join(standalone, ".next/static"), {
   recursive: true,
 });
 
-cpSync(join(root, "public"), join(standalone, "public"), {
-  recursive: true,
-});
-
-console.log("Copied static + public assets into .next/standalone");
+console.log("Copied public and .next/static into standalone output.");
