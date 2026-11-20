@@ -5,15 +5,13 @@ import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { AnimatePresence, motion } from "framer-motion";
-import { ArrowUpRight, ChevronDown, Menu, Phone, Send, X } from "lucide-react";
+import { ArrowUpRight, ChevronDown, Menu, Phone, X } from "lucide-react";
 import { mainNav } from "@/lib/site/nav";
 import { PHONE_TEL, SITE_NAME, WHATSAPP_DISPLAY } from "@/lib/site/contact";
-import { useInquire } from "./InquireContext";
 import { cn } from "@/lib/utils";
 
 export default function SiteHeader() {
   const pathname = usePathname();
-  const { setOpen } = useInquire();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [subOpen, setSubOpen] = useState<string | null>(null);
   const [scrolled, setScrolled] = useState(false);
@@ -144,14 +142,6 @@ export default function SiteHeader() {
           </a>
           <button
             type="button"
-            onClick={() => setOpen(true)}
-            className="hidden items-center gap-2 rounded-full bg-cta px-5 py-2.5 text-sm font-bold text-white shadow-lg shadow-cta/30 transition hover:-translate-y-0.5 hover:bg-cta-hover md:inline-flex"
-          >
-            <Send className="size-4" />
-            Plan my trip
-          </button>
-          <button
-            type="button"
             className="grid size-10 place-items-center rounded-full border border-border text-foreground transition hover:bg-secondary lg:hidden"
             aria-label={mobileOpen ? "Close menu" : "Open menu"}
             aria-expanded={mobileOpen}
@@ -228,16 +218,6 @@ export default function SiteHeader() {
               ))}
             </ul>
             <div className="container-site grid gap-3 pb-8">
-              <button
-                type="button"
-                onClick={() => {
-                  setMobileOpen(false);
-                  setOpen(true);
-                }}
-                className="inline-flex items-center justify-center gap-2 rounded-full bg-cta px-5 py-3 font-bold text-white"
-              >
-                <Send className="size-4" /> Plan my trip
-              </button>
               <a
                 href={PHONE_TEL}
                 className="inline-flex items-center justify-center gap-2 rounded-full border border-border px-5 py-3 font-semibold text-foreground"
