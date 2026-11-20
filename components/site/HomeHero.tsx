@@ -6,7 +6,6 @@ import Link from "next/link";
 import { AnimatePresence, motion } from "framer-motion";
 import { ArrowRight, Check, ChevronRight } from "lucide-react";
 import { heroQuickLinks, heroWords } from "@/lib/site/content";
-import TripPlanner from "./TripPlanner";
 import { iconMap } from "./icons";
 
 const trustPoints = ["Transparent pricing", "Customized packages", "Family & group planning"];
@@ -36,13 +35,9 @@ export default function HomeHero() {
         className="absolute -left-40 top-1/3 -z-10 size-[520px] rounded-full bg-primary/40 blur-3xl"
         aria-hidden
       />
-      <div
-        className="absolute right-[8%] top-16 -z-10 hidden size-72 animate-spin-slow rounded-full border-2 border-dashed border-white/10 lg:block"
-        aria-hidden
-      />
 
-      <div className="container-site grid items-center gap-12 pb-24 pt-14 md:pt-20 lg:grid-cols-[1.1fr_1fr] lg:pb-32">
-        <div>
+      <div className="container-site pb-24 pt-14 md:pt-20 lg:pb-32">
+        <div className="max-w-2xl">
           <motion.span
             initial={{ opacity: 0, y: 12 }}
             animate={{ opacity: 1, y: 0 }}
@@ -59,15 +54,15 @@ export default function HomeHero() {
             className="mt-6 text-4xl font-extrabold leading-[1.08] text-white sm:text-5xl lg:text-6xl"
           >
             Plan your perfect
-            <span className="relative mt-1 block h-[1.15em] overflow-hidden">
-              <AnimatePresence mode="wait">
+            <span className="relative block h-[1.3em] overflow-hidden">
+              <AnimatePresence initial={false}>
                 <motion.span
                   key={heroWords[index]}
                   initial={{ y: "100%", opacity: 0 }}
                   animate={{ y: 0, opacity: 1 }}
                   exit={{ y: "-100%", opacity: 0 }}
                   transition={{ duration: 0.45, ease: [0.22, 1, 0.36, 1] }}
-                  className="absolute left-0 whitespace-nowrap bg-gradient-to-r from-cta to-amber-300 bg-clip-text text-transparent"
+                  className="absolute left-0 top-0 whitespace-nowrap pb-[0.12em] leading-[1.2] text-cta"
                 >
                   {heroWords[index]} journey
                 </motion.span>
@@ -92,7 +87,7 @@ export default function HomeHero() {
             className="mt-8 flex flex-wrap gap-3"
           >
             <Link
-              href="/services#umrah"
+              href="/services/umrah"
               className="group inline-flex items-center gap-2 rounded-full bg-cta px-7 py-3.5 text-sm font-bold text-white shadow-xl shadow-cta/30 transition hover:-translate-y-0.5 hover:bg-cta-hover"
             >
               Explore Umrah packages
@@ -123,14 +118,6 @@ export default function HomeHero() {
           </motion.ul>
         </div>
 
-        <motion.div
-          initial={{ opacity: 0, y: 30, scale: 0.97 }}
-          animate={{ opacity: 1, y: 0, scale: 1 }}
-          transition={{ delay: 0.25, duration: 0.7, ease: [0.22, 1, 0.36, 1] }}
-          className="relative mx-auto w-full max-w-lg"
-        >
-          <TripPlanner />
-        </motion.div>
       </div>
 
       {/* Quick links strip overlapping the next section */}

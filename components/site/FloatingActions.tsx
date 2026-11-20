@@ -1,14 +1,18 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { usePathname } from "next/navigation";
 import { AnimatePresence, motion } from "framer-motion";
 import { ArrowUp, X } from "lucide-react";
 import { waLink, WHATSAPP_NAME } from "@/lib/site/contact";
 import { WhatsAppIcon } from "./icons";
+import { cn } from "@/lib/utils";
 
 export default function FloatingActions() {
   const [showTop, setShowTop] = useState(false);
   const [bubble, setBubble] = useState(false);
+  // The Umrah planner has a fixed estimate bar at the bottom on mobile.
+  const raised = usePathname() === "/umrah-planner";
 
   useEffect(() => {
     const onScroll = () => setShowTop(window.scrollY > 600);
@@ -24,7 +28,7 @@ export default function FloatingActions() {
   }, []);
 
   return (
-    <div className="fixed bottom-5 right-5 z-40 flex flex-col items-end gap-3">
+    <div className={cn("fixed bottom-5 right-5 z-40 flex flex-col items-end gap-3", raised && "bottom-24 lg:bottom-5")}>
       <AnimatePresence>
         {bubble && (
           <motion.div

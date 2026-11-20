@@ -17,15 +17,15 @@ export const mainNav: NavItem[] = [
     label: "Services",
     href: "/services",
     children: [
-      { label: "Umrah Packages", href: "/services#umrah", desc: "Flights, hotels, visa & ziaraat" },
-      { label: "Flight Tickets", href: "/services#tickets", desc: "Domestic & international" },
-      { label: "Visa Assistance", href: "/services#visa", desc: "Hassle-free applications" },
-      { label: "Hotel Booking", href: "/services#hotel", desc: "Near Haramain" },
-      { label: "Ziaraat & Transport", href: "/services#ziaraat", desc: "Guided tours & transfers" },
+      { label: "Umrah Packages", href: "/services/umrah", desc: "Flights, hotels, visa & ziaraat" },
+      { label: "Flight Tickets", href: "/services/flights", desc: "Domestic & international" },
+      { label: "Visa Assistance", href: "/services/visa", desc: "Hassle-free applications" },
+      { label: "Hotel Booking", href: "/services/hotels", desc: "Near Haramain" },
+      { label: "Transport", href: "/services/transport", desc: "Airport & intercity transfers" },
+      { label: "Ziaraat", href: "/services/ziaraat", desc: "Guided tours of sacred sites" },
     ],
   },
-  { label: "Hajj 2026", href: "/hajj-packages-2026" },
-  { label: "Our CEO", href: "/our-ceo" },
+  { label: "Umrah Builder", href: "/umrah-planner" },
   { label: "FAQ", href: "/faq" },
   { label: "Contact", href: "/contact-us" },
 ];
@@ -33,6 +33,7 @@ export const mainNav: NavItem[] = [
 export const footerLinks: NavChild[] = [
   { label: "Home", href: "/" },
   { label: "About Us", href: "/about-us" },
+  { label: "Our CEO", href: "/our-ceo" },
   { label: "Services", href: "/services" },
   { label: "FAQ", href: "/faq" },
   { label: "Get a Quote", href: "/get-a-quote" },
@@ -40,10 +41,11 @@ export const footerLinks: NavChild[] = [
 ];
 
 export const footerServices: NavChild[] = [
-  { label: "Umrah Packages", href: "/services#umrah" },
-  { label: "Hajj Packages 2026", href: "/hajj-packages-2026" },
-  { label: "Visa Assistance", href: "/services#visa" },
-  { label: "Flight Tickets", href: "/services#tickets" },
-  { label: "Hotel Booking", href: "/services#hotel" },
-  { label: "Transport", href: "/services#transport" },
+  { label: "Umrah Packages", href: "/services/umrah" },
+  { label: "Umrah Builder", href: "/umrah-planner" },
+  { label: "Visa Assistance", href: "/services/visa" },
+  { label: "Flight Tickets", href: "/services/flights" },
+  { label: "Hotel Booking", href: "/services/hotels" },
+  { label: "Transport", href: "/services/transport" },
+  { label: "Ziaraat", href: "/services/ziaraat" },
 ];

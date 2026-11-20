@@ -49,7 +49,7 @@ export default function PackageFlyers() {
           title="Latest Umrah package offers"
           description="Hotels in Makkah and Madinah, visa, flights and transport — tap a flyer to view it in full. Ask us for current dates and rates."
           action={
-            <div className="flex gap-2">
+            <div className="flex gap-2 lg:hidden">
               <button
                 type="button"
                 onClick={() => scroll(-1)}
@@ -73,7 +73,7 @@ export default function PackageFlyers() {
 
       <div
         ref={trackRef}
-        className="no-scrollbar flex snap-x snap-mandatory gap-5 overflow-x-auto scroll-smooth px-[max(1rem,calc((100vw-1240px)/2+1.5rem))] pb-6"
+        className="no-scrollbar flex snap-x snap-mandatory gap-5 overflow-x-auto scroll-smooth scroll-px-4 px-4 pb-6 md:scroll-px-6 md:px-6 lg:mx-auto lg:grid lg:max-w-[1240px] lg:grid-cols-5 lg:overflow-visible"
       >
         {packageFlyers.map((f, i) => (
           <motion.button
@@ -84,7 +84,7 @@ export default function PackageFlyers() {
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }}
             transition={{ delay: i * 0.07 }}
-            className="group relative w-[72vw] shrink-0 snap-start overflow-hidden rounded-3xl bg-white text-left shadow-lg shadow-navy/5 ring-1 ring-border transition hover:-translate-y-1 hover:shadow-2xl hover:shadow-navy/15 sm:w-[300px]"
+            className="group relative w-[72vw] shrink-0 snap-center sm:snap-start overflow-hidden rounded-3xl bg-white text-left shadow-lg shadow-navy/5 ring-1 ring-border transition hover:-translate-y-1 hover:shadow-2xl hover:shadow-navy/15 sm:w-[300px] lg:w-auto"
             aria-label={`View ${f.alt}`}
           >
             <span className="absolute left-4 top-4 z-10 rounded-full bg-cta px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-white">
@@ -95,7 +95,7 @@ export default function PackageFlyers() {
                 src={f.src}
                 alt={f.alt}
                 fill
-                sizes="(max-width: 640px) 72vw, 300px"
+                sizes="(max-width: 640px) 72vw, (max-width: 1024px) 300px, 240px"
                 className="object-cover object-top transition duration-700 group-hover:scale-105"
               />
               <div className="absolute inset-0 grid place-items-center bg-navy/0 transition group-hover:bg-navy/40">

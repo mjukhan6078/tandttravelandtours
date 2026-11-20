@@ -59,25 +59,17 @@ export const featureBullets = [
 export const heroWords = ["Umrah", "Hajj", "Visa", "Holiday"];
 
 export const heroQuickLinks: { label: string; href: string; icon: IconKey }[] = [
-  { label: "Hotel", href: "/services#hotel", icon: "hotel" },
-  { label: "Visa", href: "/services#visa", icon: "visa" },
-  { label: "Transport", href: "/services#transport", icon: "bus" },
-  { label: "Ziaraat", href: "/services#ziaraat", icon: "landmark" },
+  { label: "Hotel", href: "/services/hotels", icon: "hotel" },
+  { label: "Visa", href: "/services/visa", icon: "visa" },
+  { label: "Transport", href: "/services/transport", icon: "bus" },
+  { label: "Ziaraat", href: "/services/ziaraat", icon: "landmark" },
 ];
 
-/** Trip types offered in the hero trip planner. */
-export const tripTypes = [
-  { key: "Umrah", icon: "kaaba" as IconKey },
-  { key: "Hajj", icon: "moon" as IconKey },
-  { key: "Visa", icon: "visa" as IconKey },
-  { key: "Tours", icon: "globe" as IconKey },
-] as const;
-
 export const journeys: { title: string; href: string; blurb: string; icon: IconKey }[] = [
-  { title: "Umrah packages", href: "/services#umrah", blurb: "Economy to premium", icon: "kaaba" },
-  { title: "Hajj", href: "/hajj-packages-2026", blurb: "Packages & guidance", icon: "moon" },
-  { title: "Visa assistance", href: "/services#visa", blurb: "Hassle-free process", icon: "visa" },
-  { title: "Flight tickets", href: "/services#tickets", blurb: "Competitive fares", icon: "plane" },
+  { title: "Umrah packages", href: "/services/umrah", blurb: "Economy to premium", icon: "kaaba" },
+  { title: "Hajj", href: "/get-a-quote", blurb: "Packages & guidance", icon: "moon" },
+  { title: "Visa assistance", href: "/services/visa", blurb: "Hassle-free process", icon: "visa" },
+  { title: "Flight tickets", href: "/services/flights", blurb: "Competitive fares", icon: "plane" },
   { title: "International", href: "/get-a-quote", blurb: "Tours abroad", icon: "globe" },
   { title: "Domestic tours", href: "/get-a-quote", blurb: "Explore Pakistan", icon: "mountain" },
 ];
@@ -111,6 +103,8 @@ export const services: {
   description: string;
   icon: IconKey;
   points: string[];
+  /** Dedicated page for this service, when it has one. */
+  page?: string;
 }[] = [
   {
     id: "umrah",
@@ -119,6 +113,7 @@ export const services: {
       "Complete Umrah planning — flights, visa, hotels near Haramain, transport and ziaraat in one package.",
     icon: "kaaba",
     points: ["Economy to premium options", "Family & group packages", "Direct airline options"],
+    page: "/services/umrah",
   },
   {
     id: "tickets",
@@ -126,6 +121,7 @@ export const services: {
     description: "Secure your flights with the best deals available.",
     icon: "plane",
     points: ["Domestic & international", "Group bookings", "Flexible dates"],
+    page: "/services/flights",
   },
   {
     id: "visa",
@@ -133,6 +129,7 @@ export const services: {
     description: "Hassle-free visa application process.",
     icon: "visa",
     points: ["Umrah visa", "Document checklist", "Status follow-up"],
+    page: "/services/visa",
   },
   {
     id: "hotel",
@@ -140,6 +137,7 @@ export const services: {
     description: "Find the perfect accommodation for your stay.",
     icon: "hotel",
     points: ["Near Haram options", "Quad to double rooms", "Makkah & Madinah"],
+    page: "/services/hotels",
   },
   {
     id: "ziaraat",
@@ -147,6 +145,7 @@ export const services: {
     description: "Guided ziyarat tours to sacred sites in Makkah and Madina.",
     icon: "landmark",
     points: ["Makkah ziaraat", "Madinah ziaraat", "Guided by experienced staff"],
+    page: "/services/ziaraat",
   },
   {
     id: "transport",
@@ -154,6 +153,7 @@ export const services: {
     description: "Airport transfers and comfortable city-to-city transport.",
     icon: "bus",
     points: ["Airport pick & drop", "Makkah ⇄ Madinah", "Shuttle service"],
+    page: "/services/transport",
   },
 ];
 
@@ -244,6 +244,8 @@ export const interestOptions = [
   "Visa",
   "Tickets",
   "Hotels",
+  "Transport",
+  "Ziaraat",
   "Tours",
   "Other",
 ] as const;

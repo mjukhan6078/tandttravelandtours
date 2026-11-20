@@ -9,17 +9,15 @@ type PageHeroProps = {
   title: string;
   subtitle?: string;
   eyebrow?: string;
+  /** Optional parent page shown between Home and the title in the breadcrumb. */
+  parent?: { label: string; href: string };
 };
 
-export default function PageHero({ title, subtitle, eyebrow }: PageHeroProps) {
+export default function PageHero({ title, subtitle, eyebrow, parent }: PageHeroProps) {
   return (
     <section className="relative isolate overflow-hidden bg-navy">
       <Image src="/makka.jpg" alt="" fill sizes="100vw" className="-z-20 object-cover opacity-25" />
       <div className="absolute inset-0 -z-10 bg-gradient-to-r from-navy via-navy/90 to-primary/70" aria-hidden />
-      <div
-        className="absolute -right-24 -top-24 -z-10 size-96 animate-spin-slow rounded-full border-2 border-dashed border-white/10"
-        aria-hidden
-      />
       <div className="container-site py-16 md:py-24">
         <AnimatedSection>
           <nav aria-label="Breadcrumb" className="flex items-center gap-1.5 text-xs font-medium text-white/60">
@@ -27,6 +25,14 @@ export default function PageHero({ title, subtitle, eyebrow }: PageHeroProps) {
               Home
             </Link>
             <ChevronRight className="size-3.5" />
+            {parent && (
+              <>
+                <Link href={parent.href} className="transition hover:text-white">
+                  {parent.label}
+                </Link>
+                <ChevronRight className="size-3.5" />
+              </>
+            )}
             <span className="text-cta">{title}</span>
           </nav>
           {eyebrow && <p className="mt-6 text-xs font-bold uppercase tracking-[0.18em] text-cta">{eyebrow}</p>}

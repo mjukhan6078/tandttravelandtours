@@ -20,10 +20,6 @@ export const metadata: Metadata = {
   },
   description:
     "Plan your sacred Umrah and Hajj journey with T&T Travel and Tours. Trusted packages, visa support, and guided ziarat.",
-  icons: {
-    icon: "/images/logo.png",
-    apple: "/images/logo.png",
-  },
 };
 
 export default function RootLayout({
