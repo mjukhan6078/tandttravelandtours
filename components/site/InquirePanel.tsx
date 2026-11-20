@@ -50,7 +50,7 @@ export default function InquirePanel() {
                 <div>
                   <p className="text-xs font-bold uppercase tracking-[0.18em] text-cta">Plan my trip</p>
                   <h2 className="mt-1 text-xl font-bold">Tell us about your journey</h2>
-                  <p className="mt-1 text-sm text-white/70">We usually reply within a few hours.</p>
+                  <p className="mt-1 text-sm text-white/70">Send it on WhatsApp and our agent replies there.</p>
                 </div>
                 <button
                   type="button"
@@ -84,7 +84,6 @@ export default function InquirePanel() {
                 compact
                 defaultInterest={prefill.interest}
                 defaultMessage={prefill.message}
-                onSuccess={() => setTimeout(() => setOpen(false), 2200)}
               />
             </div>
           </motion.aside>

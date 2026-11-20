@@ -29,7 +29,7 @@ export default function ContactPage() {
             <span className="eyebrow">Send a message</span>
             <h2 className="mt-3 text-2xl font-extrabold text-navy md:text-3xl">How can we help you?</h2>
             <p className="mb-8 mt-2 text-sm text-muted-foreground">
-              Fill in the form and we will get back to you as soon as possible.
+              Fill in the form and send it on WhatsApp. Our agent will reply there.
             </p>
             <InquiryForm type="contact" />
           </div>

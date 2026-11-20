@@ -2,9 +2,10 @@
 
 import { useState, type FormEvent, type ReactNode } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { CircleCheck, LoaderCircle, Send } from "lucide-react";
 import { interestOptions } from "@/lib/site/content";
 import type { InquiryType } from "@/lib/inquire/types";
+import { sendInquiry } from "@/lib/inquire/client";
+import { WhatsAppIcon } from "./icons";
 import { cn } from "@/lib/utils";
 
 type InquiryFormProps = {
@@ -33,49 +34,26 @@ export default function InquiryForm({
   const [phone, setPhone] = useState("");
   const [interest, setInterest] = useState(defaultInterest);
   const [message, setMessage] = useState(defaultMessage);
-  const [status, setStatus] = useState<"idle" | "loading" | "success" | "error">("idle");
-  const [error, setError] = useState("");
+  const [sent, setSent] = useState<{ waUrl: string; opened: boolean } | null>(null);
 
-  async function handleSubmit(e: FormEvent) {
+  function handleSubmit(e: FormEvent) {
     e.preventDefault();
-    setStatus("loading");
-    setError("");
-    try {
-      const res = await fetch("/api/inquire", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          type,
-          name,
-          email,
-          phone,
-          interest: interest || undefined,
-          message,
-        }),
-      });
-      const data = (await res.json()) as { error?: string };
-      if (!res.ok) {
-        setStatus("error");
-        setError(data.error || "Something went wrong. Please try again.");
-        return;
-      }
-      setStatus("success");
-      setName("");
-      setEmail("");
-      setPhone("");
-      setInterest("");
-      setMessage("");
-      onSuccess?.();
-    } catch {
-      setStatus("error");
-      setError("Network error. Please try again.");
-    }
+    // Runs synchronously so the browser lets the WhatsApp tab open.
+    setSent(
+      sendInquiry({ type, name, email, phone, interest: interest || undefined, message })
+    );
+    setName("");
+    setEmail("");
+    setPhone("");
+    setInterest("");
+    setMessage("");
+    onSuccess?.();
   }
 
   return (
     <div className={cn("relative", className)}>
       <AnimatePresence mode="wait">
-        {status === "success" ? (
+        {sent ? (
           <motion.div
             key="success"
             initial={{ opacity: 0, scale: 0.95 }}
@@ -88,18 +66,29 @@ export default function InquiryForm({
               initial={{ scale: 0 }}
               animate={{ scale: 1 }}
               transition={{ type: "spring", stiffness: 260, damping: 15, delay: 0.1 }}
-              className="grid size-16 place-items-center rounded-full bg-emerald-50 text-emerald-600"
+              className="grid size-16 place-items-center rounded-full bg-[#25D366]/10 text-[#25D366]"
             >
-              <CircleCheck className="size-9" />
+              <WhatsAppIcon className="size-9" />
             </motion.span>
-            <h3 className="mt-4 text-lg font-bold">JazakAllah — message received!</h3>
+            <h3 className="mt-4 text-lg font-bold">Almost done — tap Send in WhatsApp</h3>
             <p className="mt-1 max-w-xs text-sm text-muted-foreground">
-              Our team will get back to you shortly on your phone or email.
+              {sent.opened
+                ? "Your message is ready in WhatsApp. Send it and our agent will reply there."
+                : "Open WhatsApp to send your message to our agent."}
             </p>
+            <a
+              href={sent.waUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="mt-5 inline-flex items-center gap-2 rounded-full bg-[#25D366] px-6 py-3 text-sm font-bold text-white transition hover:brightness-95"
+            >
+              <WhatsAppIcon className="size-4" />
+              {sent.opened ? "Open WhatsApp again" : "Open WhatsApp"}
+            </a>
             <button
               type="button"
-              onClick={() => setStatus("idle")}
-              className="mt-5 text-sm font-semibold text-primary hover:underline"
+              onClick={() => setSent(null)}
+              className="mt-4 text-sm font-semibold text-primary hover:underline"
             >
               Send another message
             </button>
@@ -196,28 +185,16 @@ export default function InquiryForm({
               />
             </Field>
 
-            {status === "error" && (
-              <p className="rounded-xl bg-destructive/5 px-4 py-3 text-sm text-destructive" role="alert">
-                {error}
-              </p>
-            )}
-
             <button
               type="submit"
-              disabled={status === "loading"}
-              className="group inline-flex h-12 w-full items-center justify-center gap-2 rounded-full bg-cta px-6 text-sm font-bold text-white shadow-lg shadow-cta/30 transition hover:bg-cta-hover disabled:opacity-70"
+              className="group inline-flex h-12 w-full items-center justify-center gap-2 rounded-full bg-[#25D366] px-6 text-sm font-bold text-white shadow-lg shadow-[#25D366]/30 transition hover:brightness-95"
             >
-              {status === "loading" ? (
-                <>
-                  <LoaderCircle className="size-4 animate-spin" /> Sending…
-                </>
-              ) : (
-                <>
-                  Send inquiry
-                  <Send className="size-4 transition group-hover:translate-x-1 group-hover:-translate-y-0.5" />
-                </>
-              )}
+              <WhatsAppIcon className="size-5" />
+              Send on WhatsApp
             </button>
+            <p className="text-center text-xs text-muted-foreground">
+              Opens WhatsApp with your details filled in. Our agent replies there.
+            </p>
           </motion.form>
         )}
       </AnimatePresence>

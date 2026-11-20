@@ -9,11 +9,9 @@ import {
   Car,
   Check,
   ChevronUp,
-  CircleCheck,
   Coffee,
   Info,
   Landmark,
-  LoaderCircle,
   Minus,
   Plane,
   PlaneLanding,
@@ -62,6 +60,7 @@ import {
 import { ROOM_TYPES, type RoomType } from "@/lib/site/hotels";
 import { transportRoutes, transportVehicles, type VehicleId } from "@/lib/site/transport";
 import { waLink } from "@/lib/site/contact";
+import { sendInquiry } from "@/lib/inquire/client";
 import { WhatsAppIcon } from "@/components/site/icons";
 import { HotelPickerModal, HotelSummary } from "./HotelPicker";
 import { AnimatedPKR } from "./PlannerParts";
@@ -1259,8 +1258,7 @@ function RequestDialog({
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
-  const [status, setStatus] = useState<"idle" | "loading" | "success" | "error">("idle");
-  const [error, setError] = useState("");
+  const [sent, setSent] = useState<{ waUrl: string; opened: boolean } | null>(null);
 
   useEffect(() => {
     if (!open) return;
@@ -1273,34 +1271,19 @@ function RequestDialog({
     };
   }, [open, onClose]);
 
-  async function submit(e: FormEvent) {
+  function submit(e: FormEvent) {
     e.preventDefault();
-    setStatus("loading");
-    setError("");
-    try {
-      const res = await fetch("/api/inquire", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          type: "quote",
-          name,
-          email,
-          phone,
-          interest: "Umrah",
-          message: `Umrah builder request\n${summaryText}`,
-        }),
-      });
-      const data = (await res.json()) as { error?: string };
-      if (!res.ok) {
-        setStatus("error");
-        setError(data.error || "Something went wrong. Please try again.");
-        return;
-      }
-      setStatus("success");
-    } catch {
-      setStatus("error");
-      setError("Network error. Please try again.");
-    }
+    // Runs synchronously so the browser lets the WhatsApp tab open.
+    setSent(
+      sendInquiry({
+        type: "quote",
+        name,
+        email,
+        phone,
+        interest: "Umrah",
+        message: `Umrah builder request\n${summaryText}`,
+      })
+    );
   }
 
   const input =
@@ -1339,30 +1322,42 @@ function RequestDialog({
               </button>
             </div>
 
-            {status === "success" ? (
+            {sent ? (
               <div className="flex flex-col items-center py-8 text-center" role="status">
-                <CircleCheck className="size-12 text-emerald-600" />
-                <p className="mt-3 font-bold text-navy">Request sent — JazakAllah!</p>
-                <p className="mt-1 text-sm text-muted-foreground">We&apos;ll contact you shortly.</p>
+                <span className="grid size-14 place-items-center rounded-full bg-[#25D366]/10 text-[#25D366]">
+                  <WhatsAppIcon className="size-8" />
+                </span>
+                <p className="mt-3 font-bold text-navy">Almost done — tap Send in WhatsApp</p>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  {sent.opened
+                    ? "Your package is ready in WhatsApp. Send it and our agent will reply there."
+                    : "Open WhatsApp to send your package to our agent."}
+                </p>
+                <a
+                  href={sent.waUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="mt-4 inline-flex items-center gap-2 rounded-full bg-[#25D366] px-6 py-3 text-sm font-bold text-white transition hover:brightness-95"
+                >
+                  <WhatsAppIcon className="size-4" />
+                  {sent.opened ? "Open WhatsApp again" : "Open WhatsApp"}
+                </a>
               </div>
             ) : (
               <form onSubmit={submit} className="mt-5 space-y-3">
                 <input className={input} placeholder="Full name" value={name} onChange={(e) => setName(e.target.value)} required minLength={2} autoComplete="name" aria-label="Full name" />
                 <input className={input} type="email" placeholder="Email" value={email} onChange={(e) => setEmail(e.target.value)} required autoComplete="email" aria-label="Email" />
                 <input className={input} type="tel" placeholder="Phone / WhatsApp" value={phone} onChange={(e) => setPhone(e.target.value)} required minLength={7} autoComplete="tel" aria-label="Phone or WhatsApp" />
-                {status === "error" && (
-                  <p className="rounded-xl bg-destructive/5 px-4 py-3 text-sm text-destructive" role="alert">
-                    {error}
-                  </p>
-                )}
                 <button
                   type="submit"
-                  disabled={status === "loading"}
-                  className="inline-flex h-12 w-full items-center justify-center gap-2 rounded-full bg-cta text-sm font-bold text-white shadow-lg shadow-cta/30 transition hover:bg-cta-hover disabled:opacity-70"
+                  className="inline-flex h-12 w-full items-center justify-center gap-2 rounded-full bg-[#25D366] text-sm font-bold text-white shadow-lg shadow-[#25D366]/30 transition hover:brightness-95"
                 >
-                  {status === "loading" ? <LoaderCircle className="size-4 animate-spin" /> : <Send className="size-4" />}
-                  {status === "loading" ? "Sending…" : "Send request"}
+                  <WhatsAppIcon className="size-5" />
+                  Send on WhatsApp
                 </button>
+                <p className="text-center text-xs text-muted-foreground">
+                  Opens WhatsApp with your package filled in. Our agent replies there.
+                </p>
               </form>
             )}
           </motion.div>
