@@ -28,9 +28,11 @@ function isEmail(value: string) {
 }
 
 export async function POST(request: Request) {
+  // Prefer X-Real-IP: the nginx proxy sets it from the connection, whereas the
+  // first X-Forwarded-For entry is whatever the client sent.
   const ip =
-    request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
     request.headers.get("x-real-ip") ||
+    request.headers.get("x-forwarded-for")?.split(",").at(-1)?.trim() ||
     "unknown";
 
   if (!rateLimit(ip)) {
