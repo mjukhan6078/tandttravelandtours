@@ -87,6 +87,8 @@ export type TransportRoute = {
   distanceKm?: number;
   duration: string;
   note: string;
+  /** Note for the return direction (airport and between-city routes run both ways). */
+  backNote?: string;
   /** PKR per vehicle, per trip. */
   rates: Record<VehicleId, number>;
 };
@@ -99,7 +101,8 @@ export const transportRoutes: TransportRoute[] = [
     to: "Makkah hotel",
     distanceKm: 100,
     duration: "~1 h 15 min",
-    note: "Meet & greet at arrivals. Also runs Makkah hotel → Jeddah Airport.",
+    note: "Meet & greet at arrivals, straight to your Makkah hotel.",
+    backNote: "Pick-up from your Makkah hotel, timed for your flight.",
     rates: { sedan: 18000, h1: 25000, gmc: 29000, hiace: 34000, coaster: 54000, bus: 90000 },
   },
   {
@@ -109,7 +112,8 @@ export const transportRoutes: TransportRoute[] = [
     to: "Madinah hotel",
     distanceKm: 20,
     duration: "~30 min",
-    note: "Meet & greet at arrivals. Also runs Madinah hotel → Madinah Airport.",
+    note: "Meet & greet at arrivals, straight to your Madinah hotel.",
+    backNote: "Pick-up from your Madinah hotel, timed for your flight.",
     rates: { sedan: 12000, h1: 17000, gmc: 19000, hiace: 23000, coaster: 36000, bus: 60000 },
   },
   {
@@ -120,6 +124,7 @@ export const transportRoutes: TransportRoute[] = [
     distanceKm: 420,
     duration: "~4 h 15 min",
     note: "Direct from the airport to Madinah, with a rest stop on the way.",
+    backNote: "From your Madinah hotel to Jeddah Airport, with a rest stop on the way.",
     rates: { sedan: 58000, h1: 81000, gmc: 93000, hiace: 110000, coaster: 174000, bus: 290000 },
   },
   {
@@ -129,7 +134,8 @@ export const transportRoutes: TransportRoute[] = [
     to: "Madinah hotel",
     distanceKm: 450,
     duration: "~4 h 30 min",
-    note: "Hotel to hotel, with a rest stop on the way. Also runs Madinah → Makkah.",
+    note: "Hotel to hotel, with a rest stop on the way.",
+    backNote: "Hotel to hotel, with a rest stop on the way.",
     rates: { sedan: 55000, h1: 77000, gmc: 88000, hiace: 105000, coaster: 165000, bus: 275000 },
   },
   {
@@ -153,3 +159,66 @@ export const transportRoutes: TransportRoute[] = [
 ];
 
 export const MAX_PASSENGERS = 60;
+
+/**
+ * One choice in the transfer picker on /services/transport. Airport and
+ * between-city routes run both ways (same rate); ziaraat tours start and end at
+ * the hotel.
+ */
+export type TransferOption = {
+  id: string;
+  routeId: string;
+  group: RouteGroup;
+  from: string;
+  to: string;
+  distanceKm?: number;
+  duration: string;
+  note: string;
+};
+
+export const transferOptions: TransferOption[] = transportRoutes.flatMap((r) => {
+  const out: TransferOption = {
+    id: r.id,
+    routeId: r.id,
+    group: r.group,
+    from: r.from,
+    to: r.to,
+    distanceKm: r.distanceKm,
+    duration: r.duration,
+    note: r.note,
+  };
+  return r.group === "ziaraat"
+    ? [out]
+    : [out, { ...out, id: `${r.id}~back`, from: r.to, to: r.from, note: r.backNote ?? r.note }];
+});
+
+export const transferById = (id: string) => transferOptions.find((t) => t.id === id)!;
+
+/** Where the traveller is after a transfer: ziaraat tours return to the hotel. */
+const endsAt = (t: TransferOption) => (t.group === "ziaraat" ? t.from : t.to);
+
+const NEXT_PREFERENCE: RouteGroup[] = ["intercity", "airport", "ziaraat"];
+
+/** A sensible next transfer: starts where the last one ended, prefers moving on over going back. */
+export function suggestNextTransfer(last: TransferOption): TransferOption {
+  const here = endsAt(last);
+  const reverseOfLast = last.id.endsWith("~back") ? last.routeId : `${last.routeId}~back`;
+  const candidates = transferOptions.filter((t) => t.from === here && t.id !== reverseOfLast && t.id !== last.id);
+  for (const g of NEXT_PREFERENCE) {
+    const hit = candidates.find((t) => t.group === g);
+    if (hit) return hit;
+  }
+  return transferOptions[0];
+}
+
+/** Every starting point in the transfer picker, in a stable order. */
+export const transferStarts: string[] = [...new Set(transferOptions.map((t) => t.from))];
+
+/** Destinations reachable from `from`. */
+export const transferDestinations = (from: string) => transferOptions.filter((t) => t.from === from);
+
+/** The transfer for a From/To pair, or the first one from `from` when that pair doesn't run. */
+export function findTransfer(from: string, to: string): TransferOption {
+  const options = transferDestinations(from);
+  return options.find((t) => t.to === to) ?? options[0];
+}
