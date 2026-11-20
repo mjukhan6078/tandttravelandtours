@@ -1,16 +1,9 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 import AnimatedSection from "@/components/AnimatedSection";
+import ContactCards from "@/components/site/ContactCards";
 import InquiryForm from "@/components/site/InquiryForm";
 import PageHero from "@/components/site/PageHero";
-import { Button } from "@/components/ui/button";
-import {
-  ADDRESS,
-  EMAIL,
-  WHATSAPP_DISPLAY,
-  WHATSAPP_NAME,
-  WHATSAPP_URL,
-} from "@/lib/site/contact";
+import { ADDRESS, MAP_EMBED_URL } from "@/lib/site/contact";
 
 export const metadata: Metadata = {
   title: "Contact Us",
@@ -22,61 +15,38 @@ export default function ContactPage() {
     <>
       <PageHero
         title="Contact Us"
-        subtitle="Get in touch for any queries or assistance"
+        eyebrow="Get in touch"
+        subtitle="Questions about Umrah, Hajj, visas or tickets? Our Karachi team is a message away."
       />
-      <section className="mx-auto grid max-w-[1170px] gap-12 px-4 py-14 md:grid-cols-2">
+
+      <section className="container-site pb-10 pt-6">
+        <ContactCards />
+      </section>
+
+      <section className="container-site grid gap-8 pb-24 pt-6 lg:grid-cols-[1.2fr_1fr]">
         <AnimatedSection>
-          <div className="space-y-6 text-sm">
-            <div className="rounded border border-border bg-white p-6">
-              <h2 className="mb-2 font-heading text-base font-bold uppercase text-primary">
-                WhatsApp
-              </h2>
-              <p className="font-semibold">{WHATSAPP_NAME}</p>
-              <a
-                href={WHATSAPP_URL}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="mt-1 block text-lg font-semibold text-primary hover:underline"
-              >
-                {WHATSAPP_DISPLAY}
-              </a>
-              <Button
-                asChild
-                className="mt-4 w-full bg-[#25D366] text-white hover:bg-[#1ebe57]"
-              >
-                <a href={WHATSAPP_URL} target="_blank" rel="noopener noreferrer">
-                  Chat on WhatsApp
-                </a>
-              </Button>
-            </div>
-            <div className="rounded border border-border bg-white p-6">
-              <h2 className="mb-2 font-heading text-base font-bold uppercase text-primary">
-                Email
-              </h2>
-              <a href={`mailto:${EMAIL}`} className="text-primary hover:underline">
-                {EMAIL}
-              </a>
-            </div>
-            <div className="rounded border border-border bg-white p-6">
-              <h2 className="mb-2 font-heading text-base font-bold uppercase text-primary">
-                Address
-              </h2>
-              <p className="text-muted-foreground">{ADDRESS}</p>
-            </div>
-            <p>
-              Prefer a quote form?{" "}
-              <Link href="/get-a-quote" className="text-primary hover:underline">
-                Get a Quote
-              </Link>
+          <div className="rounded-[2rem] border border-border bg-white p-6 shadow-xl shadow-navy/5 md:p-10">
+            <span className="eyebrow">Send a message</span>
+            <h2 className="mt-3 text-2xl font-extrabold text-navy md:text-3xl">How can we help you?</h2>
+            <p className="mb-8 mt-2 text-sm text-muted-foreground">
+              Fill in the form and we will get back to you as soon as possible.
             </p>
+            <InquiryForm type="contact" />
           </div>
         </AnimatedSection>
-        <AnimatedSection delay={0.1}>
-          <div className="rounded border border-border bg-white p-6 shadow-sm">
-            <h2 className="mb-4 font-heading text-base font-bold uppercase text-primary">
-              Send us a message
-            </h2>
-            <InquiryForm type="contact" />
+        <AnimatedSection delay={0.1} className="h-full">
+          <div className="flex h-full min-h-[420px] flex-col overflow-hidden rounded-[2rem] border border-border bg-surface">
+            <iframe
+              title="T&T Travel and Tours office location"
+              src={MAP_EMBED_URL}
+              className="min-h-[340px] w-full flex-1 border-0"
+              loading="lazy"
+              referrerPolicy="no-referrer-when-downgrade"
+            />
+            <div className="p-6">
+              <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Our office</p>
+              <p className="mt-1 font-semibold text-navy">{ADDRESS}</p>
+            </div>
           </div>
         </AnimatedSection>
       </section>

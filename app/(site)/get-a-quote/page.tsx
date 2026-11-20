@@ -1,6 +1,5 @@
 import type { Metadata } from "next";
-import AnimatedSection from "@/components/AnimatedSection";
-import InquiryForm from "@/components/site/InquiryForm";
+import FormPage from "@/components/site/FormPage";
 import PageHero from "@/components/site/PageHero";
 
 export const metadata: Metadata = {
@@ -13,15 +12,14 @@ export default function GetAQuotePage() {
     <>
       <PageHero
         title="Get a Quote"
-        subtitle="Tell us about your trip and we will respond soon"
+        eyebrow="Free, no obligation"
+        subtitle="Tell us about your trip and we will send you a tailored package with clear pricing."
       />
-      <section className="mx-auto max-w-xl px-4 py-14">
-        <AnimatedSection>
-          <div className="rounded border border-border bg-white p-6 shadow-sm">
-            <InquiryForm type="quote" />
-          </div>
-        </AnimatedSection>
-      </section>
+      <FormPage
+        type="quote"
+        heading="A package built around you"
+        intro="Share your dates, travellers and preferences — we handle flights, visa, hotels and transport."
+      />
     </>
   );
 }

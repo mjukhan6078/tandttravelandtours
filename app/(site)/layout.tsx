@@ -1,4 +1,5 @@
 import TopBar from "@/components/TopBar";
+import FloatingActions from "@/components/site/FloatingActions";
 import { InquireProvider } from "@/components/site/InquireContext";
 import InquirePanel from "@/components/site/InquirePanel";
 import SiteFooter from "@/components/site/SiteFooter";
@@ -11,14 +12,13 @@ export default function SiteLayout({
 }) {
   return (
     <InquireProvider>
-      <div className="sticky top-0 z-40">
-        <TopBar />
-        <SiteHeader />
-      </div>
+      <TopBar />
+      <SiteHeader />
       <main id="main-content" className="flex-1">
         {children}
       </main>
       <SiteFooter />
+      <FloatingActions />
       <InquirePanel />
     </InquireProvider>
   );

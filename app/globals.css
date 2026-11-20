@@ -7,9 +7,19 @@
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-montserrat);
+  --font-sans: var(--font-jakarta);
   --font-mono: var(--font-geist-mono);
-  --font-heading: var(--font-montserrat);
+  --font-heading: var(--font-jakarta);
+  --color-navy: var(--navy);
+  --color-navy-2: var(--navy-2);
+  --color-cta: var(--cta);
+  --color-cta-hover: var(--cta-hover);
+  --color-brand-cyan: var(--brand-cyan);
+  --color-surface: var(--surface);
+  --animate-float-slow: float-slow 6s ease-in-out infinite;
+  --animate-spin-slow: spin-slow 40s linear infinite;
+  --animate-marquee: marquee 40s linear infinite;
+  --animate-ping-soft: ping-soft 2s cubic-bezier(0, 0, 0.2, 1) infinite;
   --color-sidebar-ring: var(--sidebar-ring);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
@@ -49,48 +59,51 @@
 }
 
 /*
-  Logo owns cool royal blue + cyan on black.
-  App UI uses warm gold accents on black/white for complementary contrast.
+  Palette follows the logo: royal blue + cyan, deep navy for dark bands,
+  warm orange for calls to action.
 */
 :root {
-  --brand-blue: #104090;
-  --brand-cyan: #10a0c0;
+  --brand-blue: #1846a3;
+  --brand-cyan: #1fa5c9;
+  --navy: #0a1f44;
+  --navy-2: #102a5c;
+  --cta: #f7931e;
+  --cta-hover: #e47f0a;
+  --surface: #f4f7fc;
 
   --background: #ffffff;
-  --foreground: #141414;
+  --foreground: #0f1b33;
   --card: #ffffff;
-  --card-foreground: #141414;
+  --card-foreground: #0f1b33;
   --popover: #ffffff;
-  --popover-foreground: #141414;
-  --primary: #c9a227;
-  --primary-foreground: #141414;
-  --secondary: #e8c547;
-  --secondary-foreground: #141414;
-  --muted: #f5f5f5;
-  --muted-foreground: #555555;
-  --accent: #fff8e6;
-  --accent-foreground: #7a5c0a;
-  --destructive: #c62828;
-  --border: #e2e2e2;
-  --input: #cccccc;
-  --ring: #c9a227;
-  --chart-1: #c9a227;
-  --chart-2: #104090;
-  --chart-3: #10a0c0;
-  --chart-4: #555555;
-  --chart-5: #9a7209;
-  --radius: 0.25rem;
-  --sidebar: #f5f5f5;
-  --sidebar-foreground: #141414;
-  --sidebar-primary: #c9a227;
-  --sidebar-primary-foreground: #141414;
-  --sidebar-accent: #fff8e6;
-  --sidebar-accent-foreground: #7a5c0a;
-  --sidebar-border: #e2e2e2;
-  --sidebar-ring: #c9a227;
-  --header: #000000;
-  --header-foreground: #ffffff;
-  --primary-hover: #9a7209;
+  --popover-foreground: #0f1b33;
+  --primary: #1846a3;
+  --primary-foreground: #ffffff;
+  --secondary: #eaf1fd;
+  --secondary-foreground: #1846a3;
+  --muted: #f4f7fc;
+  --muted-foreground: #5b6780;
+  --accent: #eaf1fd;
+  --accent-foreground: #1846a3;
+  --destructive: #d92d20;
+  --border: #e3e8f2;
+  --input: #d5dcea;
+  --ring: #1fa5c9;
+  --chart-1: #1846a3;
+  --chart-2: #1fa5c9;
+  --chart-3: #f7931e;
+  --chart-4: #5b6780;
+  --chart-5: #0a1f44;
+  --radius: 0.75rem;
+  --sidebar: #f4f7fc;
+  --sidebar-foreground: #0f1b33;
+  --sidebar-primary: #1846a3;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #eaf1fd;
+  --sidebar-accent-foreground: #1846a3;
+  --sidebar-border: #e3e8f2;
+  --sidebar-ring: #1fa5c9;
+  --primary-hover: #12367f;
 }
 
 @layer base {
@@ -109,7 +122,70 @@
   h4,
   h5,
   h6 {
-    font-family: var(--font-montserrat), ui-sans-serif, system-ui, sans-serif;
+    font-family: var(--font-heading), ui-sans-serif, system-ui, sans-serif;
     font-weight: 700;
+    letter-spacing: -0.02em;
+  }
+}
+
+@utility container-site {
+  margin-inline: auto;
+  width: 100%;
+  max-width: 1240px;
+  padding-inline: 1rem;
+  @media (width >= 48rem) {
+    padding-inline: 1.5rem;
+  }
+}
+
+@utility eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--cta);
+  &::before {
+    content: "";
+    width: 1.75rem;
+    height: 2px;
+    border-radius: 9999px;
+    background: currentColor;
+  }
+}
+
+@utility no-scrollbar {
+  scrollbar-width: none;
+  &::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+@keyframes float-slow {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-12px); }
+}
+
+@keyframes spin-slow {
+  to { transform: rotate(360deg); }
+}
+
+@keyframes marquee {
+  to { transform: translateX(-50%); }
+}
+
+@keyframes ping-soft {
+  0% { transform: scale(1); opacity: 0.6; }
+  100% { transform: scale(1.8); opacity: 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
   }
 }

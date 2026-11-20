@@ -1,6 +1,5 @@
 import type { Metadata } from "next";
-import AnimatedSection from "@/components/AnimatedSection";
-import InquiryForm from "@/components/site/InquiryForm";
+import FormPage from "@/components/site/FormPage";
 import PageHero from "@/components/site/PageHero";
 
 export const metadata: Metadata = {
@@ -13,15 +12,14 @@ export default function InquireNowPage() {
     <>
       <PageHero
         title="Inquire Now"
-        subtitle="Ask us anything about Umrah, Hajj, or travel services"
+        eyebrow="We're here to help"
+        subtitle="Ask us anything about Umrah, Hajj, visas, tickets or tours."
       />
-      <section className="mx-auto max-w-xl px-4 py-14">
-        <AnimatedSection>
-          <div className="rounded border border-border bg-white p-6 shadow-sm">
-            <InquiryForm type="inquire" />
-          </div>
-        </AnimatedSection>
-      </section>
+      <FormPage
+        type="inquire"
+        heading="Ask our travel experts"
+        intro="Real people, fast replies — before, during and after your journey."
+      />
     </>
   );
 }

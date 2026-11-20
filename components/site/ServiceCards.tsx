@@ -1,41 +1,73 @@
-import Link from "next/link";
-import AnimatedSection from "@/components/AnimatedSection";
-import { Button } from "@/components/ui/button";
-import { tailoredServices } from "@/lib/site/content";
+"use client";
 
-export default function ServiceCards() {
+import Link from "next/link";
+import { motion } from "framer-motion";
+import { ArrowRight, Check } from "lucide-react";
+import { services } from "@/lib/site/content";
+import SectionHeading from "./SectionHeading";
+import { iconMap } from "./icons";
+
+export default function ServiceCards({ withHeading = true }: { withHeading?: boolean }) {
   return (
-    <section className="bg-white px-4 py-14 md:py-20">
-      <div className="mx-auto max-w-[1170px]">
-        <AnimatedSection>
-          <div className="mb-10 text-center">
-            <h2 className="font-heading text-2xl font-bold uppercase tracking-wide text-primary md:text-3xl">
-              Tailored Journeys
-            </h2>
-            <p className="mt-3 text-muted-foreground">
-              Our Hajj, Umrah & travel services
-            </p>
-          </div>
-        </AnimatedSection>
-        <div className="grid gap-6 sm:grid-cols-2">
-          {tailoredServices.map((card, idx) => (
-            <AnimatedSection key={card.title} delay={idx * 0.08}>
-              <article className="flex h-full flex-col rounded-md border border-[#ddd] bg-white p-6 shadow-sm transition duration-300 hover:-translate-y-1 hover:shadow-md">
-                <h3 className="mb-3 font-heading text-lg font-bold uppercase tracking-wide text-primary">
-                  {card.title}
-                </h3>
-                <p className="mb-6 flex-1 text-sm leading-relaxed text-[#555]">
-                  {card.text}
-                </p>
-                <Button
-                  asChild
-                  className="w-fit bg-primary hover:bg-[var(--primary-hover)] uppercase text-xs"
+    <section className="bg-white py-16 md:py-24">
+      <div className="container-site">
+        {withHeading && (
+          <SectionHeading
+            eyebrow="Our services"
+            title="Tailored services for every traveller"
+            description="Pick one service or let us arrange the complete journey."
+            action={
+              <Link
+                href="/services"
+                className="group inline-flex items-center gap-2 rounded-full border border-border px-5 py-2.5 text-sm font-semibold text-navy transition hover:border-primary hover:text-primary"
+              >
+                All services <ArrowRight className="size-4 transition group-hover:translate-x-1" />
+              </Link>
+            }
+          />
+        )}
+
+        <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+          {services.map((s, i) => {
+            const Icon = iconMap[s.icon];
+            return (
+              <motion.article
+                key={s.id}
+                id={withHeading ? undefined : s.id}
+                initial={{ opacity: 0, y: 24 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true, margin: "-60px" }}
+                transition={{ delay: (i % 3) * 0.08, duration: 0.5 }}
+                className="group relative scroll-mt-28 overflow-hidden rounded-3xl border border-border bg-white p-7 transition duration-300 hover:-translate-y-1 hover:border-transparent hover:shadow-2xl hover:shadow-primary/15"
+              >
+                <div className="absolute inset-x-0 top-0 h-1 origin-left scale-x-0 bg-gradient-to-r from-primary via-brand-cyan to-cta transition duration-500 group-hover:scale-x-100" />
+                <div className="flex items-start justify-between">
+                  <span className="grid size-14 place-items-center rounded-2xl bg-secondary text-primary transition duration-300 group-hover:rotate-6 group-hover:bg-primary group-hover:text-white">
+                    <Icon className="size-6" />
+                  </span>
+                  <span className="text-4xl font-extrabold text-surface transition group-hover:text-secondary">
+                    0{i + 1}
+                  </span>
+                </div>
+                <h3 className="mt-5 text-lg font-bold text-navy">{s.title}</h3>
+                <p className="mt-2 text-sm leading-relaxed text-muted-foreground">{s.description}</p>
+                <ul className="mt-4 space-y-1.5">
+                  {s.points.map((p) => (
+                    <li key={p} className="flex items-center gap-2 text-sm text-foreground/80">
+                      <Check className="size-4 text-cta" strokeWidth={3} />
+                      {p}
+                    </li>
+                  ))}
+                </ul>
+                <Link
+                  href="/get-a-quote"
+                  className="mt-6 inline-flex items-center gap-2 text-sm font-bold text-primary transition group-hover:gap-3"
                 >
-                  <Link href={card.href}>Get a Quote</Link>
-                </Button>
-              </article>
-            </AnimatedSection>
-          ))}
+                  Get a quote <ArrowRight className="size-4" />
+                </Link>
+              </motion.article>
+            );
+          })}
         </div>
       </div>
     </section>

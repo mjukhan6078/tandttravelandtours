@@ -10,7 +10,7 @@ export const metadata: Metadata = {
 export default function FaqPage() {
   return (
     <>
-      <PageHero title="FAQ" subtitle="Answers to common questions" />
+      <PageHero title="FAQ" eyebrow="Help centre" subtitle="Answers to common questions about our packages and services." />
       <FaqSection />
     </>
   );
