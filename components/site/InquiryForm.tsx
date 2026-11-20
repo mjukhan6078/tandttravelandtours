@@ -4,8 +4,8 @@ import { useState, type FormEvent, type ReactNode } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { interestOptions } from "@/lib/site/content";
 import type { InquiryType } from "@/lib/inquire/types";
-import { sendInquiry } from "@/lib/inquire/client";
-import { WhatsAppIcon } from "./icons";
+import { emailInquiry, openWhatsAppInquiry } from "@/lib/inquire/client";
+import QuerySent, { SendButtons, submittedChannel, type SentState } from "./QuerySent";
 import { cn } from "@/lib/utils";
 
 type InquiryFormProps = {
@@ -34,14 +34,11 @@ export default function InquiryForm({
   const [phone, setPhone] = useState("");
   const [interest, setInterest] = useState(defaultInterest);
   const [message, setMessage] = useState(defaultMessage);
-  const [sent, setSent] = useState<{ waUrl: string; opened: boolean } | null>(null);
+  const [sent, setSent] = useState<SentState | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
 
-  function handleSubmit(e: FormEvent) {
-    e.preventDefault();
-    // Runs synchronously so the browser lets the WhatsApp tab open.
-    setSent(
-      sendInquiry({ type, name, email, phone, interest: interest || undefined, message })
-    );
+  function reset() {
     setName("");
     setEmail("");
     setPhone("");
@@ -50,49 +47,32 @@ export default function InquiryForm({
     onSuccess?.();
   }
 
+  async function handleSubmit(e: FormEvent) {
+    e.preventDefault();
+    setError("");
+    const payload = { type, name, email, phone, interest: interest || undefined, message };
+    if (submittedChannel(e) === "whatsapp") {
+      // Before any await, so the browser lets the WhatsApp tab open.
+      setSent({ channel: "whatsapp", ...openWhatsAppInquiry(payload) });
+      reset();
+      return;
+    }
+    setLoading(true);
+    const problem = await emailInquiry(payload);
+    setLoading(false);
+    if (problem) {
+      setError(problem);
+      return;
+    }
+    setSent({ channel: "email" });
+    reset();
+  }
+
   return (
     <div className={cn("relative", className)}>
       <AnimatePresence mode="wait">
         {sent ? (
-          <motion.div
-            key="success"
-            initial={{ opacity: 0, scale: 0.95 }}
-            animate={{ opacity: 1, scale: 1 }}
-            exit={{ opacity: 0 }}
-            className="flex flex-col items-center py-10 text-center"
-            role="status"
-          >
-            <motion.span
-              initial={{ scale: 0 }}
-              animate={{ scale: 1 }}
-              transition={{ type: "spring", stiffness: 260, damping: 15, delay: 0.1 }}
-              className="grid size-16 place-items-center rounded-full bg-[#25D366]/10 text-[#25D366]"
-            >
-              <WhatsAppIcon className="size-9" />
-            </motion.span>
-            <h3 className="mt-4 text-lg font-bold">Almost done — tap Send in WhatsApp</h3>
-            <p className="mt-1 max-w-xs text-sm text-muted-foreground">
-              {sent.opened
-                ? "Your message is ready in WhatsApp. Send it and our agent will reply there."
-                : "Open WhatsApp to send your message to our agent."}
-            </p>
-            <a
-              href={sent.waUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="mt-5 inline-flex items-center gap-2 rounded-full bg-[#25D366] px-6 py-3 text-sm font-bold text-white transition hover:brightness-95"
-            >
-              <WhatsAppIcon className="size-4" />
-              {sent.opened ? "Open WhatsApp again" : "Open WhatsApp"}
-            </a>
-            <button
-              type="button"
-              onClick={() => setSent(null)}
-              className="mt-4 text-sm font-semibold text-primary hover:underline"
-            >
-              Send another message
-            </button>
-          </motion.div>
+          <QuerySent key="sent" sent={sent} onReset={() => setSent(null)} />
         ) : (
           <motion.form
             key="form"
@@ -116,13 +96,13 @@ export default function InquiryForm({
                   className={fieldClass}
                 />
               </Field>
-              <Field label="Email" htmlFor={`${type}-email`}>
+              <Field label="Email (optional)" htmlFor={`${type}-email`}>
                 <input
                   id={`${type}-email`}
                   type="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  required
+                  maxLength={200}
                   autoComplete="email"
                   placeholder="you@email.com"
                   className={fieldClass}
@@ -185,16 +165,13 @@ export default function InquiryForm({
               />
             </Field>
 
-            <button
-              type="submit"
-              className="group inline-flex h-12 w-full items-center justify-center gap-2 rounded-full bg-[#25D366] px-6 text-sm font-bold text-white shadow-lg shadow-[#25D366]/30 transition hover:brightness-95"
-            >
-              <WhatsAppIcon className="size-5" />
-              Send on WhatsApp
-            </button>
-            <p className="text-center text-xs text-muted-foreground">
-              Opens WhatsApp with your details filled in. Our agent replies there.
-            </p>
+            {error && (
+              <p className="rounded-xl bg-destructive/5 px-4 py-3 text-sm text-destructive" role="alert">
+                {error}
+              </p>
+            )}
+
+            <SendButtons loading={loading} />
           </motion.form>
         )}
       </AnimatePresence>

@@ -59,9 +59,8 @@ import {
 } from "@/lib/site/pricing";
 import { ROOM_TYPES, type RoomType } from "@/lib/site/hotels";
 import { transportRoutes, transportVehicles, type VehicleId } from "@/lib/site/transport";
-import { waLink } from "@/lib/site/contact";
-import { sendInquiry } from "@/lib/inquire/client";
-import { WhatsAppIcon } from "@/components/site/icons";
+import { emailInquiry, openWhatsAppInquiry } from "@/lib/inquire/client";
+import QuerySent, { SendButtons, submittedChannel, type SentState } from "@/components/site/QuerySent";
 import { HotelPickerModal, HotelSummary } from "./HotelPicker";
 import { AnimatedPKR } from "./PlannerParts";
 import { cn } from "@/lib/utils";
@@ -208,7 +207,6 @@ export default function UmrahPlanner() {
       endDate={endDate}
       dateValid={dateValid}
       shortOnBeds={shortOnBeds}
-      summaryText={summaryText}
       onRequest={() => {
         setPassOpen(false);
         setRequestOpen(true);
@@ -275,7 +273,8 @@ export default function UmrahPlanner() {
         </button>
       </div>
 
-      <RequestDialog open={requestOpen} onClose={() => setRequestOpen(false)} summaryText={summaryText} total={quote.total} />
+      {/* Keyed so each opening starts fresh, with no "sent" screen from a previous query. */}
+      <RequestDialog key={requestOpen ? "open" : "closed"} open={requestOpen} onClose={() => setRequestOpen(false)} summaryText={summaryText} total={quote.total} />
     </section>
   );
 }
@@ -1102,7 +1101,6 @@ function BoardingPass({
   endDate,
   dateValid,
   shortOnBeds,
-  summaryText,
   onRequest,
 }: {
   state: PlannerState;
@@ -1113,7 +1111,6 @@ function BoardingPass({
   endDate: string;
   dateValid: boolean;
   shortOnBeds: boolean;
-  summaryText: string;
   onRequest: () => void;
 }) {
   const [showFare, setShowFare] = useState(false);
@@ -1200,23 +1197,13 @@ function BoardingPass({
           )}
         </AnimatePresence>
 
-        <div className="mt-5 grid gap-2">
-          <button
-            type="button"
-            onClick={onRequest}
-            className="inline-flex h-12 items-center justify-center gap-2 rounded-full bg-cta text-sm font-bold text-white shadow-lg shadow-cta/30 transition hover:-translate-y-0.5 hover:bg-cta-hover"
-          >
-            <Send className="size-4" /> Request this package
-          </button>
-          <a
-            href={waLink(`Assalam o Alaikum, I built an Umrah package on your website:\n\n${summaryText}`)}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-flex h-11 items-center justify-center gap-2 rounded-full border border-[#25D366]/40 text-sm font-bold text-[#1da851] transition hover:bg-[#25D366] hover:text-white"
-          >
-            <WhatsAppIcon className="size-4" /> Share on WhatsApp
-          </a>
-        </div>
+        <button
+          type="button"
+          onClick={onRequest}
+          className="mt-5 inline-flex h-12 w-full items-center justify-center gap-2 rounded-full bg-cta text-sm font-bold text-white shadow-lg shadow-cta/30 transition hover:-translate-y-0.5 hover:bg-cta-hover"
+        >
+          <Send className="size-4" /> Send query
+        </button>
 
         <div
           className="mx-auto mt-5 h-10 w-full max-w-[260px] opacity-80 [background-image:repeating-linear-gradient(90deg,#0a1f44_0_2px,transparent_2px_4px,#0a1f44_4px_5px,transparent_5px_8px,#0a1f44_8px_11px,transparent_11px_12px)]"
@@ -1256,9 +1243,10 @@ function RequestDialog({
   total: number;
 }) {
   const [name, setName] = useState("");
-  const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
-  const [sent, setSent] = useState<{ waUrl: string; opened: boolean } | null>(null);
+  const [sent, setSent] = useState<SentState | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
 
   useEffect(() => {
     if (!open) return;
@@ -1271,19 +1259,26 @@ function RequestDialog({
     };
   }, [open, onClose]);
 
-  function submit(e: FormEvent) {
+  async function submit(e: FormEvent) {
     e.preventDefault();
-    // Runs synchronously so the browser lets the WhatsApp tab open.
-    setSent(
-      sendInquiry({
-        type: "quote",
-        name,
-        email,
-        phone,
-        interest: "Umrah",
-        message: `Umrah builder request\n${summaryText}`,
-      })
-    );
+    setError("");
+    const payload = {
+      type: "quote" as const,
+      name,
+      phone,
+      interest: "Umrah",
+      message: `Umrah builder request\n${summaryText}`,
+    };
+    if (submittedChannel(e) === "whatsapp") {
+      // Before any await, so the browser lets the WhatsApp tab open.
+      setSent({ channel: "whatsapp", ...openWhatsAppInquiry(payload) });
+      return;
+    }
+    setLoading(true);
+    const problem = await emailInquiry(payload);
+    setLoading(false);
+    if (problem) setError(problem);
+    else setSent({ channel: "email" });
   }
 
   const input =
@@ -1302,7 +1297,7 @@ function RequestDialog({
           <motion.div
             role="dialog"
             aria-modal="true"
-            aria-label="Request this package"
+            aria-label="Send your package query"
             initial={{ y: 40, opacity: 0 }}
             animate={{ y: 0, opacity: 1 }}
             exit={{ y: 40, opacity: 0 }}
@@ -1312,7 +1307,7 @@ function RequestDialog({
             <div className="flex items-start justify-between">
               <div>
                 <p className="text-xs font-bold uppercase tracking-[0.18em] text-cta">Almost there</p>
-                <h2 className="mt-1 text-xl font-extrabold text-navy">Request this package</h2>
+                <h2 className="mt-1 text-xl font-extrabold text-navy">Send your query</h2>
                 <p className="mt-1 text-sm text-muted-foreground">
                   Estimated {formatPKR(total)} — our team will confirm availability and the final price.
                 </p>
@@ -1323,41 +1318,17 @@ function RequestDialog({
             </div>
 
             {sent ? (
-              <div className="flex flex-col items-center py-8 text-center" role="status">
-                <span className="grid size-14 place-items-center rounded-full bg-[#25D366]/10 text-[#25D366]">
-                  <WhatsAppIcon className="size-8" />
-                </span>
-                <p className="mt-3 font-bold text-navy">Almost done — tap Send in WhatsApp</p>
-                <p className="mt-1 text-sm text-muted-foreground">
-                  {sent.opened
-                    ? "Your package is ready in WhatsApp. Send it and our agent will reply there."
-                    : "Open WhatsApp to send your package to our agent."}
-                </p>
-                <a
-                  href={sent.waUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="mt-4 inline-flex items-center gap-2 rounded-full bg-[#25D366] px-6 py-3 text-sm font-bold text-white transition hover:brightness-95"
-                >
-                  <WhatsAppIcon className="size-4" />
-                  {sent.opened ? "Open WhatsApp again" : "Open WhatsApp"}
-                </a>
-              </div>
+              <QuerySent sent={sent} />
             ) : (
               <form onSubmit={submit} className="mt-5 space-y-3">
-                <input className={input} placeholder="Full name" value={name} onChange={(e) => setName(e.target.value)} required minLength={2} autoComplete="name" aria-label="Full name" />
-                <input className={input} type="email" placeholder="Email" value={email} onChange={(e) => setEmail(e.target.value)} required autoComplete="email" aria-label="Email" />
-                <input className={input} type="tel" placeholder="Phone / WhatsApp" value={phone} onChange={(e) => setPhone(e.target.value)} required minLength={7} autoComplete="tel" aria-label="Phone or WhatsApp" />
-                <button
-                  type="submit"
-                  className="inline-flex h-12 w-full items-center justify-center gap-2 rounded-full bg-[#25D366] text-sm font-bold text-white shadow-lg shadow-[#25D366]/30 transition hover:brightness-95"
-                >
-                  <WhatsAppIcon className="size-5" />
-                  Send on WhatsApp
-                </button>
-                <p className="text-center text-xs text-muted-foreground">
-                  Opens WhatsApp with your package filled in. Our agent replies there.
-                </p>
+                <input className={input} placeholder="Your name" value={name} onChange={(e) => setName(e.target.value)} required minLength={2} maxLength={100} autoComplete="name" aria-label="Your name" />
+                <input className={input} type="tel" placeholder="WhatsApp / phone number" value={phone} onChange={(e) => setPhone(e.target.value)} required minLength={7} maxLength={30} autoComplete="tel" aria-label="WhatsApp or phone number" />
+                {error && (
+                  <p className="rounded-xl bg-destructive/5 px-4 py-3 text-sm text-destructive" role="alert">
+                    {error}
+                  </p>
+                )}
+                <SendButtons loading={loading} />
               </form>
             )}
           </motion.div>

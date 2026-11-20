@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { appendInquiry } from "@/lib/inquire/store";
-import type { InquiryType } from "@/lib/inquire/types";
+import { emailInquiry, isEmailConfigured } from "@/lib/inquire/mailer";
+import type { InquiryChannel, InquiryRecord, InquiryType } from "@/lib/inquire/types";
 
 const TYPES: InquiryType[] = ["contact", "quote", "inquire"];
 
@@ -54,12 +55,15 @@ export async function POST(request: Request) {
   }
 
   const data = body as Record<string, unknown>;
+  // Single-line fields end up in email headers, so line breaks are collapsed.
+  const line = (v: unknown) => String(v ?? "").replace(/[\r\n]+/g, " ").trim();
   const type = String(data.type || "");
-  const name = String(data.name || "").trim();
-  const email = String(data.email || "").trim();
-  const phone = String(data.phone || "").trim();
+  const channel: InquiryChannel = data.channel === "email" ? "email" : "whatsapp";
+  const name = line(data.name);
+  const email = line(data.email);
+  const phone = line(data.phone);
   const message = String(data.message || "").trim();
-  const interest = data.interest ? String(data.interest).trim() : undefined;
+  const interest = data.interest ? line(data.interest) || undefined : undefined;
 
   if (!TYPES.includes(type as InquiryType)) {
     return NextResponse.json({ error: "Invalid inquiry type." }, { status: 400 });
@@ -67,7 +71,7 @@ export async function POST(request: Request) {
   if (!name || name.length < 2) {
     return NextResponse.json({ error: "Please enter your full name." }, { status: 400 });
   }
-  if (!email || !isEmail(email)) {
+  if (email && !isEmail(email)) {
     return NextResponse.json({ error: "Please enter a valid email." }, { status: 400 });
   }
   if (!phone || phone.length < 7) {
@@ -89,21 +93,54 @@ export async function POST(request: Request) {
     );
   }
 
+  if (channel === "email" && !isEmailConfigured()) {
+    return NextResponse.json(
+      { error: "Email isn't available right now. Please send your query on WhatsApp." },
+      { status: 503 }
+    );
+  }
+
+  let record: InquiryRecord;
   try {
-    const record = await appendInquiry({
+    record = await appendInquiry({
       type: type as InquiryType,
+      channel,
       name,
-      email,
+      email: email || undefined,
       phone,
       message,
       interest,
     });
-    return NextResponse.json({ ok: true, id: record.id });
   } catch (err) {
     console.error("[inquire] could not save inquiry", err);
-    return NextResponse.json(
-      { error: "We couldn't save your message. Please try again or message us on WhatsApp." },
-      { status: 500 }
-    );
+    if (channel === "whatsapp") {
+      return NextResponse.json({ error: "Could not save a copy." }, { status: 500 });
+    }
+    // Still try to email it: the inbox matters more than the backup file.
+    record = {
+      id: `unsaved_${Date.now()}`,
+      createdAt: new Date().toISOString(),
+      type: type as InquiryType,
+      channel,
+      name,
+      email: email || undefined,
+      phone,
+      message,
+      interest,
+    };
   }
+
+  if (channel === "email") {
+    try {
+      await emailInquiry(record);
+    } catch (err) {
+      console.error("[inquire] could not email inquiry", record.id, err);
+      return NextResponse.json(
+        { error: "We couldn't send your query by email. Please send it on WhatsApp instead." },
+        { status: 502 }
+      );
+    }
+  }
+
+  return NextResponse.json({ ok: true, id: record.id });
 }
