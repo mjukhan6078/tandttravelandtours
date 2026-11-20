@@ -1,10 +1,18 @@
 /**
- * Umrah planner rates and quote calculation.
+ * Umrah builder (/umrah-planner) data and quote calculation.
  *
- * ⚠️ PLACEHOLDER RATES — every PKR figure below is a dummy value for layout and
- * testing. Replace them with real T&T rates before going live, then set
- * PRICING_IS_PLACEHOLDER to false (it controls the "sample rates" notice).
+ * Hotels and their room rates come from lib/site/hotels.ts, vehicles and
+ * per-trip transfer / ziaraat rates from lib/site/transport.ts, and the visa
+ * fee from lib/site/visa.ts, so the builder always matches the service pages.
+ *
+ * ⚠️ PLACEHOLDER RATES — the figures here and in those files are dummy values.
+ * Replace them with real T&T rates, then set PRICING_IS_PLACEHOLDER to false
+ * (it controls the "sample rates" notice).
  */
+
+import { ROOM_TYPES, hotels, type Hotel, type RoomType } from "./hotels";
+import { transportRoutes, transportVehicles, type TransportVehicle, type VehicleId } from "./transport";
+import { visaTypes } from "./visa";
 
 export const PRICING_IS_PLACEHOLDER = true;
 
@@ -12,231 +20,260 @@ export const PRICING_IS_PLACEHOLDER = true;
 export const BOOKING = {
   minLeadDays: 7,
   maxAheadDays: 180,
-  minNights: 5,
-  maxNights: 30,
+  minNights: 3,
+  maxNights: 60,
+  maxStops: 4,
   maxTravellers: 50,
 };
 
 export type CityId = "makkah" | "madinah";
-export type Sharing = "quint" | "quad" | "triple" | "double";
 
 export const CITY_LABEL: Record<CityId, string> = {
   makkah: "Makkah",
   madinah: "Madinah",
 };
 
-/** Legs are built from the first city and whether the trip returns there. */
-export function buildLegs(startCity: CityId, roundTrip: boolean): CityId[] {
-  const other: CityId = startCity === "makkah" ? "madinah" : "makkah";
-  return roundTrip ? [startCity, other, startCity] : [startCity, other];
+export const AIRPORT: Record<CityId, { code: string; name: string }> = {
+  makkah: { code: "JED", name: "Jeddah Airport" },
+  madinah: { code: "MED", name: "Madinah Airport" },
+};
+
+/* ───────────── route ───────────── */
+
+export type RouteId = "mk-md" | "md-mk" | "mk-md-mk" | "md-mk-md" | "custom";
+
+export const ROUTE_PRESETS: { id: Exclude<RouteId, "custom">; label: string; desc: string; cities: CityId[] }[] = [
+  { id: "mk-md", label: "Makkah → Madinah", desc: "Standard route", cities: ["makkah", "madinah"] },
+  { id: "md-mk", label: "Madinah → Makkah", desc: "Madinah first", cities: ["madinah", "makkah"] },
+  {
+    id: "mk-md-mk",
+    label: "Makkah → Madinah → Makkah",
+    desc: "Start and end in Makkah",
+    cities: ["makkah", "madinah", "makkah"],
+  },
+  {
+    id: "md-mk-md",
+    label: "Madinah → Makkah → Madinah",
+    desc: "Start and end in Madinah",
+    cities: ["madinah", "makkah", "madinah"],
+  },
+];
+
+/** Default nights per stop for a city sequence. */
+export function defaultNights(cities: CityId[]): number[] {
+  if (cities.length === 1) return [7];
+  if (cities.length === 2) return cities[0] === "makkah" ? [5, 4] : [4, 5];
+  return cities.map((_, i) => (i === 0 || i === cities.length - 1 ? 3 : 4));
 }
 
-export function defaultNights(startCity: CityId, roundTrip: boolean): number[] {
-  if (roundTrip) return startCity === "makkah" ? [4, 4, 3] : [3, 5, 3];
-  return startCity === "makkah" ? [5, 4] : [4, 5];
+/* ───────────── hotels & rooms ───────────── */
+
+export type ComfortId = "economy" | "standard" | "premium";
+
+export const COMFORT_LEVELS: { id: ComfortId; name: string; tagline: string }[] = [
+  { id: "economy", name: "Economy", tagline: "Lowest-priced stays" },
+  { id: "standard", name: "Standard", tagline: "Balanced price and distance" },
+  { id: "premium", name: "Premium", tagline: "Closest 5★ to the Haram" },
+];
+
+export const hotelsIn = (city: CityId) => hotels.filter((h) => h.city === city);
+export const hotelById = (id: string | null) => (id ? hotels.find((h) => h.id === id) : undefined);
+
+/** The hotel a comfort level picks in a city. */
+export function pickHotel(city: CityId, comfort: ComfortId): Hotel {
+  const list = hotelsIn(city);
+  if (comfort === "premium") {
+    return [...list].filter((h) => h.stars === 5).sort((a, b) => a.distanceM - b.distanceM)[0] ?? list[0];
+  }
+  const byPrice = [...list].sort((a, b) => a.rates.quad - b.rates.quad);
+  return comfort === "economy" ? byPrice[0] : byPrice[Math.floor(byPrice.length / 2)];
 }
 
-/** One-click comfort levels; each sets the hotel tier in both cities. */
-export const COMFORT_LEVELS: {
-  id: string;
-  name: string;
-  tagline: string;
-  includes: string[];
-}[] = [
-  {
-    id: "economy",
-    name: "Economy",
-    tagline: "Value stays with shuttle to the Haram",
-    includes: ["3★ hotels", "Shuttle service", "Shared transport options"],
-  },
-  {
-    id: "standard",
-    name: "Standard",
-    tagline: "Walking distance, breakfast included",
-    includes: ["4★ hotels", "~500 m to Haram", "Breakfast included"],
-  },
-  {
-    id: "premium",
-    name: "Premium",
-    tagline: "Steps from the Haram in 5★ comfort",
-    includes: ["5★ hotels", "~150 m to Haram", "Haram view options"],
-  },
-];
+export type Rooms = Record<RoomType, number>;
 
-export const SHARING_OPTIONS: { id: Sharing; label: string; perRoom: number }[] = [
-  { id: "quint", label: "Quint", perRoom: 5 },
-  { id: "quad", label: "Quad", perRoom: 4 },
-  { id: "triple", label: "Triple", perRoom: 3 },
-  { id: "double", label: "Double", perRoom: 2 },
-];
+export const bedsIn = (rooms: Rooms) => ROOM_TYPES.reduce((n, r) => n + rooms[r.id] * r.guests, 0);
+export const roomCount = (rooms: Rooms) => ROOM_TYPES.reduce((n, r) => n + rooms[r.id], 0);
 
-export type HotelTier = {
-  id: string;
-  name: string;
-  stars: number;
-  distance: string;
-  perks: string[];
-  /** PKR per adult per night, by room sharing. */
-  rates: Record<Sharing, number>;
+/** Fill rooms of the preferred type, then one smaller room for any remainder. */
+export function suggestRooms(guests: number, pref: RoomType): Rooms {
+  const rooms: Rooms = { double: 0, triple: 0, quad: 0 };
+  const beds = ROOM_TYPES.find((r) => r.id === pref)!.guests;
+  rooms[pref] = Math.floor(guests / beds);
+  const rest = guests % beds;
+  if (rest) {
+    const fit = ROOM_TYPES.find((r) => r.guests >= rest)!;
+    rooms[fit.id] += 1;
+  }
+  return rooms;
+}
+
+export const breakfastIncluded = (h: Hotel | undefined) =>
+  !!h?.perks.some((p) => p.toLowerCase().includes("breakfast included"));
+
+/** PKR per person (adults + children) per night when breakfast is added. */
+export const BREAKFAST_PER_PERSON_NIGHT = 2500;
+
+export type Stop = {
+  city: CityId;
+  nights: number;
+  /** null = transit only, no hotel. */
+  hotelId: string | null;
+  rooms: Rooms;
+  breakfast: boolean;
 };
 
-export const HOTEL_TIERS: Record<CityId, HotelTier[]> = {
-  makkah: [
-    {
-      id: "economy",
-      name: "Economy",
-      stars: 3,
-      distance: "~1,000 m from Haram · shuttle",
-      perks: ["Shuttle service", "Breakfast optional"],
-      rates: { quint: 4000, quad: 4500, triple: 5500, double: 7500 },
-    },
-    {
-      id: "standard",
-      name: "Standard",
-      stars: 4,
-      distance: "~500 m from Haram",
-      perks: ["Walking distance", "Breakfast included"],
-      rates: { quint: 7000, quad: 8000, triple: 9500, double: 13000 },
-    },
-    {
-      id: "premium",
-      name: "Premium",
-      stars: 5,
-      distance: "~150 m from Haram",
-      perks: ["Haram view options", "Breakfast included"],
-      rates: { quint: 15000, quad: 17000, triple: 20000, double: 28000 },
-    },
-  ],
-  madinah: [
-    {
-      id: "economy",
-      name: "Economy",
-      stars: 3,
-      distance: "~800 m from Masjid an-Nabawi",
-      perks: ["Shuttle service", "Breakfast optional"],
-      rates: { quint: 3500, quad: 4000, triple: 5000, double: 6500 },
-    },
-    {
-      id: "standard",
-      name: "Standard",
-      stars: 4,
-      distance: "~350 m from Masjid an-Nabawi",
-      perks: ["Walking distance", "Breakfast included"],
-      rates: { quint: 6000, quad: 7000, triple: 8500, double: 11000 },
-    },
-    {
-      id: "premium",
-      name: "Premium",
-      stars: 5,
-      distance: "~100 m from Masjid an-Nabawi",
-      perks: ["Markazia area", "Breakfast included"],
-      rates: { quint: 12000, quad: 14000, triple: 17000, double: 24000 },
-    },
-  ],
+/* ───────────── transport ───────────── */
+
+export const vehicleById = (id: VehicleId) => transportVehicles.find((v) => v.id === id)!;
+
+export const carsNeeded = (v: TransportVehicle, people: number) => Math.max(1, Math.ceil(people / v.seats));
+
+/** Cheapest single vehicle that seats everyone, else the largest. */
+export function bestVehicle(people: number): VehicleId {
+  const fits = transportVehicles.filter((v) => v.seats >= people);
+  return (fits[0] ?? transportVehicles[transportVehicles.length - 1]).id;
+}
+
+export type Transfer = { id: string; label: string; routeId: string };
+
+/** Airport arrival, every city change, and airport departure. */
+export function transfersFor(stops: Stop[]): Transfer[] {
+  if (!stops.length) return [];
+  const first = stops[0].city;
+  const last = stops[stops.length - 1].city;
+  const airportRoute = (c: CityId) => (c === "makkah" ? "jed-makkah" : "med-airport");
+  const out: Transfer[] = [
+    { id: "arrive", label: `${AIRPORT[first].name} → ${CITY_LABEL[first]} hotel`, routeId: airportRoute(first) },
+  ];
+  stops.slice(1).forEach((s, i) => {
+    const from = stops[i].city;
+    out.push({
+      id: `move-${i + 1}`,
+      label: `${CITY_LABEL[from]} hotel → ${CITY_LABEL[s.city]} hotel`,
+      routeId: "makkah-madinah",
+    });
+  });
+  out.push({ id: "depart", label: `${CITY_LABEL[last]} hotel → ${AIRPORT[last].name}`, routeId: airportRoute(last) });
+  return out;
+}
+
+const routeRate = (routeId: string, v: VehicleId) => transportRoutes.find((r) => r.id === routeId)!.rates[v];
+
+export const ZIARAAT_ROUTE: Record<CityId, string> = {
+  makkah: "makkah-ziaraat",
+  madinah: "madinah-ziaraat",
 };
 
-/** Children (2–11) pay this share of the adult hotel rate; infants stay free. */
-export const CHILD_HOTEL_FACTOR = 0.5;
+/* ───────────── other extras ───────────── */
 
-export const VISA = { adult: 65000, child: 55000, infant: 25000 };
+export const NATIONALITIES = ["Pakistan", "United Kingdom", "United States", "Canada", "UAE", "Other"];
 
-export type Vehicle = {
-  id: string;
-  name: string;
-  capacity: number;
-  desc: string;
-  /** PKR for the whole package (airport transfers + intercity), or per person if perPerson. */
-  price: number;
-  perPerson?: boolean;
+/** Umrah visa fee per person, from the visa page. */
+export const VISA_FEE = visaTypes.find((v) => v.id === "umrah")!.fee;
+
+export const FLIGHTS = {
+  label: "Return flights from Karachi (estimate)",
+  adult: 165000,
+  child: 140000,
+  infant: 35000,
 };
 
-export const VEHICLES: Vehicle[] = [
-  { id: "shuttle", name: "Shared shuttle", capacity: 50, desc: "Shared coach on fixed schedules", price: 18000, perPerson: true },
-  { id: "sedan", name: "Private sedan", capacity: 3, desc: "Camry or similar", price: 55000 },
-  { id: "gmc", name: "GMC / H1 van", capacity: 7, desc: "Family van with luggage space", price: 85000 },
-  { id: "coaster", name: "Coaster", capacity: 18, desc: "Mini-bus for small groups", price: 160000 },
-  { id: "bus", name: "Bus", capacity: 45, desc: "Full-size coach for large groups", price: 280000 },
-];
-
-export const ADDONS = {
-  ziaraat: { label: "Guided ziaraat (Makkah & Madinah)", perPerson: 8000 },
-  flights: {
-    label: "Return flights from Karachi (estimate)",
-    adult: 165000,
-    child: 140000,
-    infant: 35000,
-  },
-};
+/* ───────────── state & quote ───────────── */
 
 export type PlannerState = {
-  startCity: CityId;
-  roundTrip: boolean;
+  route: RouteId;
+  stops: Stop[];
   startDate: string; // YYYY-MM-DD
-  nights: number[]; // one entry per leg (see buildLegs)
   adults: number;
   children: number;
+  childAges: number[];
   infants: number;
-  sharing: Sharing;
-  hotels: Record<CityId, string>; // tier id per city
-  vehicleId: string;
-  ziaraat: boolean;
+  nationality: string;
+  roomPref: RoomType;
+  comfort: ComfortId | "custom";
+  transportMode: "full" | "selective";
+  vehicleId: VehicleId;
+  cars: number;
+  /** Selective mode: vehicle per transfer id; "" = no vehicle for that leg. */
+  legVehicles: Record<string, VehicleId | "">;
+  ziaraat: CityId[];
+  visa: boolean;
   flights: boolean;
 };
 
 export type QuoteLine = { label: string; detail: string; amount: number };
 
-export function nightsByCity(state: PlannerState): Record<CityId, number> {
-  const out: Record<CityId, number> = { makkah: 0, madinah: 0 };
-  buildLegs(state.startCity, state.roundTrip).forEach((city, i) => {
-    out[city] += state.nights[i] ?? 0;
-  });
-  return out;
-}
+export const seated = (s: Pick<PlannerState, "adults" | "children">) => s.adults + s.children;
 
 export function calculateQuote(state: PlannerState) {
   const lines: QuoteLine[] = [];
-  const perCity = nightsByCity(state);
-  const paying = state.adults + state.children;
-  const everyone = paying + state.infants;
+  const guests = seated(state);
+  const everyone = guests + state.infants;
 
-  (Object.keys(perCity) as CityId[]).forEach((city) => {
-    const n = perCity[city];
-    if (!n) return;
-    const tier = HOTEL_TIERS[city].find((t) => t.id === state.hotels[city]) ?? HOTEL_TIERS[city][0];
-    const rate = tier.rates[state.sharing];
-    const amount = n * rate * (state.adults + state.children * CHILD_HOTEL_FACTOR);
+  state.stops.forEach((stop, i) => {
+    const hotel = hotelById(stop.hotelId);
+    const where = `${CITY_LABEL[stop.city]} · stop ${i + 1}`;
+    if (!hotel) {
+      lines.push({ label: where, detail: `Transit only · ${stop.nights} nights`, amount: 0 });
+      return;
+    }
+    const perNight = ROOM_TYPES.reduce((sum, r) => sum + stop.rooms[r.id] * hotel.rates[r.id], 0);
+    const rooms = ROOM_TYPES.filter((r) => stop.rooms[r.id])
+      .map((r) => `${stop.rooms[r.id]} ${r.label.toLowerCase()}`)
+      .join(", ");
     lines.push({
-      label: `${CITY_LABEL[city]} hotel`,
-      detail: `${tier.name} · ${n} night${n > 1 ? "s" : ""} · ${state.sharing}`,
-      amount,
+      label: `${hotel.name}`,
+      detail: `${where} · ${stop.nights} nights · ${rooms || "no rooms"}`,
+      amount: perNight * stop.nights,
+    });
+    if (stop.breakfast && !breakfastIncluded(hotel)) {
+      lines.push({
+        label: "Breakfast",
+        detail: `${CITY_LABEL[stop.city]} · ${guests} guests × ${stop.nights} nights`,
+        amount: BREAKFAST_PER_PERSON_NIGHT * guests * stop.nights,
+      });
+    }
+  });
+
+  const transfers = transfersFor(state.stops);
+  if (state.transportMode === "full") {
+    const v = vehicleById(state.vehicleId);
+    const total = transfers.reduce((sum, t) => sum + routeRate(t.routeId, v.id), 0) * state.cars;
+    lines.push({
+      label: "Transport",
+      detail: `${state.cars} × ${v.name} · ${transfers.length} transfers`,
+      amount: total,
+    });
+  } else {
+    transfers.forEach((t) => {
+      const id = state.legVehicles[t.id];
+      if (!id) return;
+      const v = vehicleById(id);
+      const cars = carsNeeded(v, guests);
+      lines.push({
+        label: t.label,
+        detail: `${cars} × ${v.name}`,
+        amount: routeRate(t.routeId, id) * cars,
+      });
+    });
+  }
+
+  const ziaraatVehicle =
+    state.transportMode === "full" ? vehicleById(state.vehicleId) : vehicleById(bestVehicle(guests));
+  const ziaraatCars = state.transportMode === "full" ? state.cars : carsNeeded(ziaraatVehicle, guests);
+  state.ziaraat.forEach((city) => {
+    lines.push({
+      label: `${CITY_LABEL[city]} ziaraat`,
+      detail: `${ziaraatCars} × ${ziaraatVehicle.name}`,
+      amount: routeRate(ZIARAAT_ROUTE[city], ziaraatVehicle.id) * ziaraatCars,
     });
   });
 
-  lines.push({
-    label: "Umrah visa",
-    detail: [
-      `${state.adults} adult${state.adults > 1 ? "s" : ""}`,
-      state.children ? `${state.children} child` : "",
-      state.infants ? `${state.infants} infant` : "",
-    ]
-      .filter(Boolean)
-      .join(" · "),
-    amount:
-      state.adults * VISA.adult + state.children * VISA.child + state.infants * VISA.infant,
-  });
-
-  const vehicle = VEHICLES.find((v) => v.id === state.vehicleId) ?? VEHICLES[0];
-  lines.push({
-    label: "Transport",
-    detail: `${vehicle.name} · transfers & intercity`,
-    amount: vehicle.perPerson ? vehicle.price * paying : vehicle.price,
-  });
-
-  if (state.ziaraat) {
+  if (state.visa) {
     lines.push({
-      label: "Ziaraat",
-      detail: `${paying} traveller${paying > 1 ? "s" : ""}`,
-      amount: ADDONS.ziaraat.perPerson * paying,
+      label: "Umrah visa",
+      detail: `${everyone} traveller${everyone > 1 ? "s" : ""}`,
+      amount: VISA_FEE * everyone,
     });
   }
 
@@ -244,15 +281,12 @@ export function calculateQuote(state: PlannerState) {
     lines.push({
       label: "Return flights",
       detail: `${everyone} passenger${everyone > 1 ? "s" : ""}`,
-      amount:
-        state.adults * ADDONS.flights.adult +
-        state.children * ADDONS.flights.child +
-        state.infants * ADDONS.flights.infant,
+      amount: state.adults * FLIGHTS.adult + state.children * FLIGHTS.child + state.infants * FLIGHTS.infant,
     });
   }
 
   const total = Math.round(lines.reduce((s, l) => s + l.amount, 0));
-  return { lines, total, perPerson: paying ? Math.round(total / paying) : total };
+  return { lines, total, perPerson: guests ? Math.round(total / guests) : total };
 }
 
 export function formatPKR(amount: number) {

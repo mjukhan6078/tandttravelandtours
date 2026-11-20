@@ -7,7 +7,7 @@ import UmrahPlanner from "@/components/planner/UmrahPlanner";
 export const metadata: Metadata = {
   title: "Build Your Umrah",
   description:
-    "Map out your Umrah journey with T&T Travel and Tours — set nights in Makkah and Madinah, choose your comfort level and group, and see your estimated fare live.",
+    "Map out your Umrah journey with T&T Travel and Tours — set your route and nights, choose hotels, rooms, transport and extras, and see your estimated fare live.",
 };
 
 const promises = [
@@ -34,7 +34,7 @@ export default function UmrahPlannerPage() {
       <PageHero
         title="Build Your Umrah"
         eyebrow="Umrah journey builder"
-        subtitle="Map your route between Makkah and Madinah, pick your comfort level and watch your Umrah pass come together."
+        subtitle="Map your route between Makkah and Madinah, choose hotels, rooms, transport and extras, and watch your Umrah pass come together."
       />
       <UmrahPlanner />
       <section className="border-t border-border bg-white py-14">

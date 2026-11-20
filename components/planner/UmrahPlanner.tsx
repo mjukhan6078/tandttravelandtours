@@ -3,12 +3,15 @@
 import { Fragment, useEffect, useMemo, useState, type FormEvent, type ReactNode } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import {
-  BedSingle,
+  BedDouble,
   Bus,
   CalendarDays,
+  Car,
   Check,
   ChevronUp,
   CircleCheck,
+  Coffee,
+  Footprints,
   Info,
   Landmark,
   LoaderCircle,
@@ -17,28 +20,49 @@ import {
   PlaneLanding,
   PlaneTakeoff,
   Plus,
+  Route,
   Send,
-  Shuffle,
+  Stamp,
   Ticket,
+  TriangleAlert,
   UserRound,
   X,
 } from "lucide-react";
 import {
-  ADDONS,
+  AIRPORT,
   BOOKING,
+  BREAKFAST_PER_PERSON_NIGHT,
   CITY_LABEL,
   COMFORT_LEVELS,
-  HOTEL_TIERS,
+  FLIGHTS,
+  NATIONALITIES,
   PRICING_IS_PLACEHOLDER,
-  SHARING_OPTIONS,
-  VEHICLES,
-  buildLegs,
+  ROUTE_PRESETS,
+  VISA_FEE,
+  ZIARAAT_ROUTE,
+  bedsIn,
+  bestVehicle,
+  breakfastIncluded,
   calculateQuote,
+  carsNeeded,
   defaultNights,
   formatPKR,
+  hotelById,
+  hotelsIn,
+  pickHotel,
+  roomCount,
+  seated,
+  suggestRooms,
+  transfersFor,
+  vehicleById,
   type CityId,
+  type ComfortId,
   type PlannerState,
+  type RouteId,
+  type Stop,
 } from "@/lib/site/pricing";
+import { ROOM_TYPES, formatDistance, walkMinutes, type RoomType } from "@/lib/site/hotels";
+import { transportRoutes, transportVehicles, type VehicleId } from "@/lib/site/transport";
 import { waLink } from "@/lib/site/contact";
 import { WhatsAppIcon } from "@/components/site/icons";
 import { AnimatedPKR, Stars } from "./PlannerParts";
@@ -59,25 +83,65 @@ function shortDate(iso: string) {
 }
 
 const ARABIC: Record<CityId, string> = { makkah: "مكة المكرمة", madinah: "المدينة المنورة" };
-const AIRPORT: Record<CityId, string> = { makkah: "JED", madinah: "MED" };
+const DEFAULT_CHILD_AGE = 6;
 
+function makeStops(cities: CityId[], comfort: ComfortId, guests: number, pref: RoomType): Stop[] {
+  const nights = defaultNights(cities);
+  return cities.map((city, i) => ({
+    city,
+    nights: nights[i],
+    hotelId: pickHotel(city, comfort).id,
+    rooms: suggestRooms(guests, pref),
+    breakfast: false,
+  }));
+}
+
+const INITIAL_GUESTS = 2;
 const INITIAL: PlannerState = {
-  startCity: "makkah",
-  roundTrip: false,
+  route: "mk-md",
+  stops: makeStops(["makkah", "madinah"], "standard", INITIAL_GUESTS, "quad"),
   startDate: "",
-  nights: defaultNights("makkah", false),
-  adults: 2,
+  adults: INITIAL_GUESTS,
   children: 0,
+  childAges: [],
   infants: 0,
-  sharing: "quad",
-  hotels: { makkah: "standard", madinah: "standard" },
-  vehicleId: "gmc",
-  ziaraat: true,
+  nationality: "Pakistan",
+  roomPref: "quad",
+  comfort: "standard",
+  transportMode: "full",
+  vehicleId: bestVehicle(INITIAL_GUESTS),
+  cars: 1,
+  legVehicles: {},
+  ziaraat: ["makkah", "madinah"],
+  visa: true,
   flights: false,
 };
 
 type Quote = ReturnType<typeof calculateQuote>;
 type Update = (patch: Partial<PlannerState>) => void;
+
+/** Keep derived fields consistent after any change. */
+function normalize(prev: PlannerState, next: PlannerState): PlannerState {
+  const guests = seated(next);
+
+  if (next.children !== prev.children) {
+    next.childAges = Array.from({ length: next.children }, (_, i) => prev.childAges[i] ?? DEFAULT_CHILD_AGE);
+  }
+  next.infants = Math.min(next.infants, next.adults);
+
+  // Re-suggest rooms when the group or room preference changes.
+  if (guests !== seated(prev) || next.roomPref !== prev.roomPref) {
+    next.stops = next.stops.map((s) => (s.hotelId ? { ...s, rooms: suggestRooms(guests, next.roomPref) } : s));
+  }
+
+  // Enough cars for everyone; reset to the minimum when the vehicle changes.
+  const needed = carsNeeded(vehicleById(next.vehicleId), guests);
+  if (next.vehicleId !== prev.vehicleId || next.cars < needed) next.cars = needed;
+
+  const cities = new Set(next.stops.map((s) => s.city));
+  next.ziaraat = next.ziaraat.filter((c) => cities.has(c));
+  return next;
+}
 
 /* ───────────── main ───────────── */
 
@@ -91,39 +155,48 @@ export default function UmrahPlanner() {
     return { min: addDays(today, BOOKING.minLeadDays), max: addDays(today, BOOKING.maxAheadDays) };
   }, []);
 
-  const legs = buildLegs(state.startCity, state.roundTrip);
-  const totalNights = state.nights.reduce((a, b) => a + b, 0);
-  const travellers = state.adults + state.children + state.infants;
+  const update: Update = (patch) => setState((prev) => normalize(prev, { ...prev, ...patch }));
+
+  const guests = seated(state);
+  const totalNights = state.stops.reduce((a, s) => a + s.nights, 0);
+  const travellers = guests + state.infants;
   const quote = calculateQuote(state);
   const dateValid = !!state.startDate && state.startDate >= range.min && state.startDate <= range.max;
   const endDate = dateValid ? addDays(state.startDate, totalNights) : "";
-  const comfort =
-    state.hotels.makkah === state.hotels.madinah
-      ? COMFORT_LEVELS.find((c) => c.id === state.hotels.makkah)?.name ?? "Custom"
-      : "Custom mix";
-
-  /** Merge a change and keep the chosen vehicle big enough for the group. */
-  const update: Update = (patch) =>
-    setState((prev) => {
-      const next = { ...prev, ...patch };
-      const people = next.adults + next.children + next.infants;
-      const vehicle = VEHICLES.find((v) => v.id === next.vehicleId);
-      if (!vehicle || vehicle.capacity < people) {
-        next.vehicleId = (VEHICLES.find((v) => !v.perPerson && v.capacity >= people) ?? VEHICLES[0]).id;
-      }
-      return next;
-    });
+  const comfortName =
+    state.comfort === "custom" ? "Custom" : COMFORT_LEVELS.find((c) => c.id === state.comfort)!.name;
+  const shortOnBeds = state.stops.some((s) => s.hotelId && bedsIn(s.rooms) < guests);
 
   const summaryText = [
-    `Journey: Karachi → ${legs.map((c, i) => `${CITY_LABEL[c]} (${state.nights[i]}n)`).join(" → ")} → Karachi`,
+    `Route: ${AIRPORT[state.stops[0].city].code} → ${state.stops
+      .map((s) => `${CITY_LABEL[s.city]} (${s.nights}n)`)
+      .join(" → ")} → ${AIRPORT[state.stops[state.stops.length - 1].city].code}`,
     dateValid
       ? `Dates: ${shortDate(state.startDate)} – ${shortDate(endDate)} (${totalNights} nights)`
       : `Dates: flexible (${totalNights} nights)`,
-    `Travellers: ${state.adults} adults, ${state.children} children, ${state.infants} infants`,
-    `Rooms: ${state.sharing} sharing`,
-    `Hotels: Makkah ${state.hotels.makkah}, Madinah ${state.hotels.madinah}`,
-    `Transport: ${VEHICLES.find((v) => v.id === state.vehicleId)?.name}`,
-    `Ziaraat: ${state.ziaraat ? "yes" : "no"} · Flights: ${state.flights ? "yes" : "no"}`,
+    `Travellers: ${state.adults} adults, ${state.children} children${
+      state.children ? ` (ages ${state.childAges.join(", ")})` : ""
+    }, ${state.infants} infants · Nationality: ${state.nationality}`,
+    ...state.stops.map((s, i) => {
+      const h = hotelById(s.hotelId);
+      if (!h) return `Stop ${i + 1} ${CITY_LABEL[s.city]}: transit only`;
+      const rooms = ROOM_TYPES.filter((r) => s.rooms[r.id])
+        .map((r) => `${s.rooms[r.id]} ${r.label.toLowerCase()}`)
+        .join(", ");
+      const bf = breakfastIncluded(h) ? "breakfast included" : s.breakfast ? "with breakfast" : "room only";
+      return `Stop ${i + 1} ${CITY_LABEL[s.city]}: ${h.name} · ${rooms} · ${bf}`;
+    }),
+    state.transportMode === "full"
+      ? `Transport: full · ${state.cars} × ${vehicleById(state.vehicleId).name}`
+      : `Transport: selective · ${
+          transfersFor(state.stops)
+            .filter((t) => state.legVehicles[t.id])
+            .map((t) => `${t.label} (${vehicleById(state.legVehicles[t.id] as VehicleId).name})`)
+            .join("; ") || "none"
+        }`,
+    `Ziaraat: ${state.ziaraat.length ? state.ziaraat.map((c) => CITY_LABEL[c]).join(", ") : "no"} · Visa: ${
+      state.visa ? "yes" : "no"
+    } · Flights: ${state.flights ? "yes" : "no"}`,
     `Estimated total: ${formatPKR(quote.total)} (${formatPKR(quote.perPerson)} per person)`,
   ].join("\n");
 
@@ -131,11 +204,12 @@ export default function UmrahPlanner() {
     <BoardingPass
       state={state}
       quote={quote}
-      comfort={comfort}
+      comfort={comfortName}
       totalNights={totalNights}
       travellers={travellers}
       endDate={endDate}
       dateValid={dateValid}
+      shortOnBeds={shortOnBeds}
       summaryText={summaryText}
       onRequest={() => {
         setPassOpen(false);
@@ -146,26 +220,21 @@ export default function UmrahPlanner() {
 
   return (
     <section className="container-site pb-28 pt-4 lg:pb-24">
-      <JourneyMap
-        state={state}
-        update={update}
-        legs={legs}
-        range={range}
-        totalNights={totalNights}
-        endDate={endDate}
-        dateValid={dateValid}
-      />
+      <JourneyMap state={state} update={update} range={range} totalNights={totalNights} endDate={endDate} dateValid={dateValid} />
 
       <div className="mt-8 grid items-start gap-8 lg:grid-cols-[1fr_380px]">
         <div className="space-y-6">
-          <Panel index="01" title="Pick your comfort" subtitle="One tap sets hotels in both cities — or mix and match.">
-            <ComfortPicker state={state} update={update} />
-          </Panel>
-          <Panel index="02" title="Who's coming along?" subtitle="Add your travellers and choose how you'd like to share rooms.">
+          <Panel index="01" title="Who's travelling?" subtitle="Your group, children's ages, nationality and room preference.">
             <Travellers state={state} update={update} />
           </Panel>
-          <Panel index="03" title="Getting around" subtitle="Airport transfers and the Makkah ⇄ Madinah drive, plus extras.">
-            <Transport state={state} update={update} travellers={travellers} />
+          <Panel index="02" title="Choose your hotels" subtitle="Pick a hotel, room types and breakfast for every stop — or skip a hotel for transit.">
+            <Hotels state={state} update={update} />
+          </Panel>
+          <Panel index="03" title="Getting around" subtitle="One vehicle for every transfer, or choose per route.">
+            <Transport state={state} update={update} />
+          </Panel>
+          <Panel index="04" title="Extras" subtitle="Visa processing, guided ziaraat and flights.">
+            <Extras state={state} update={update} />
           </Panel>
         </div>
         <aside className="hidden lg:sticky lg:top-24 lg:block">{pass}</aside>
@@ -208,12 +277,7 @@ export default function UmrahPlanner() {
         </button>
       </div>
 
-      <RequestDialog
-        open={requestOpen}
-        onClose={() => setRequestOpen(false)}
-        summaryText={summaryText}
-        total={quote.total}
-      />
+      <RequestDialog open={requestOpen} onClose={() => setRequestOpen(false)} summaryText={summaryText} total={quote.total} />
     </section>
   );
 }
@@ -223,7 +287,6 @@ export default function UmrahPlanner() {
 function JourneyMap({
   state,
   update,
-  legs,
   range,
   totalNights,
   endDate,
@@ -231,19 +294,35 @@ function JourneyMap({
 }: {
   state: PlannerState;
   update: Update;
-  legs: CityId[];
   range: { min: string; max: string };
   totalNights: number;
   endDate: string;
   dateValid: boolean;
 }) {
-  const setLeg = (i: number, value: number) => {
-    const nights = [...state.nights];
-    nights[i] = value;
-    update({ nights });
+  const comfort: ComfortId = state.comfort === "custom" ? "standard" : state.comfort;
+  const guests = seated(state);
+  const first = state.stops[0]?.city;
+  const last = state.stops[state.stops.length - 1]?.city;
+
+  const setNights = (i: number, value: number) =>
+    update({ stops: state.stops.map((s, j) => (j === i ? { ...s, nights: value } : s)) });
+
+  const pickRoute = (id: RouteId) => {
+    if (id === "custom") return update({ route: "custom" });
+    const preset = ROUTE_PRESETS.find((r) => r.id === id)!;
+    update({ route: id, stops: makeStops(preset.cities, comfort, guests, state.roomPref) });
   };
-  const setRoute = (startCity: CityId, roundTrip: boolean) =>
-    update({ startCity, roundTrip, nights: defaultNights(startCity, roundTrip) });
+
+  const addCity = (city: CityId) => {
+    const stop = makeStops([city], comfort, guests, state.roomPref)[0];
+    update({ route: "custom", stops: [...state.stops, { ...stop, nights: 3 }] });
+  };
+
+  const removeStop = (i: number) => update({ route: "custom", stops: state.stops.filter((_, j) => j !== i) });
+
+  // Removing a stop must not leave the same city twice in a row.
+  const canRemove = (i: number) =>
+    state.stops.length > 1 && !(state.stops[i - 1] && state.stops[i + 1] && state.stops[i - 1].city === state.stops[i + 1].city);
 
   return (
     <div className="relative overflow-clip rounded-[2rem] bg-navy p-5 text-white shadow-2xl shadow-navy/30 md:p-8">
@@ -253,53 +332,71 @@ function JourneyMap({
       />
       <div className="pointer-events-none absolute -right-24 -top-24 size-80 rounded-full bg-primary/50 blur-3xl" aria-hidden />
 
-      {/* controls */}
-      <div className="relative flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+      <div className="relative flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
         <div>
           <p className="text-xs font-bold uppercase tracking-[0.18em] text-cta">Your journey</p>
           <p className="mt-1 text-2xl font-extrabold">
-            {totalNights} nights · {legs.length} stops
+            {totalNights} nights · {state.stops.length} stop{state.stops.length > 1 ? "s" : ""}
           </p>
         </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <div className="flex rounded-full bg-white/10 p-1 text-xs font-semibold" role="radiogroup" aria-label="First city">
-            {(["makkah", "madinah"] as CityId[]).map((c) => (
-              <button
-                key={c}
-                type="button"
-                role="radio"
-                aria-checked={state.startCity === c}
-                onClick={() => setRoute(c, state.roundTrip)}
-                className="relative rounded-full px-4 py-2"
-              >
-                {state.startCity === c && (
-                  <motion.span layoutId="start-city" className="absolute inset-0 rounded-full bg-white" />
-                )}
-                <span className={cn("relative", state.startCity === c ? "text-navy" : "text-white/80")}>
-                  Start in {CITY_LABEL[c]}
-                </span>
-              </button>
-            ))}
-          </div>
-          <button
-            type="button"
-            role="switch"
-            aria-checked={state.roundTrip}
-            onClick={() => setRoute(state.startCity, !state.roundTrip)}
-            className={cn(
-              "inline-flex items-center gap-2 rounded-full px-4 py-2 text-xs font-semibold ring-1 transition",
-              state.roundTrip ? "bg-cta text-white ring-cta" : "text-white/80 ring-white/20 hover:bg-white/10"
-            )}
-          >
-            <Shuffle className="size-3.5" />
-            Return to {CITY_LABEL[state.startCity]}
-          </button>
-        </div>
+        <p className="text-xs text-white/60" suppressHydrationWarning>
+          Start dates: {shortDate(range.min)} – {shortDate(range.max)}
+        </p>
       </div>
+
+      {/* Route presets */}
+      <div className="relative mt-5 flex flex-wrap gap-2" role="radiogroup" aria-label="Route">
+        {[...ROUTE_PRESETS, { id: "custom" as const, label: "Custom route", desc: "Your own city order" }].map((r) => {
+          const active = state.route === r.id;
+          return (
+            <button
+              key={r.id}
+              type="button"
+              role="radio"
+              aria-checked={active}
+              title={r.desc}
+              onClick={() => pickRoute(r.id)}
+              className={cn(
+                "rounded-full px-4 py-2 text-xs font-semibold ring-1 transition",
+                active ? "bg-white text-navy ring-white" : "text-white/80 ring-white/20 hover:bg-white/10"
+              )}
+            >
+              {r.label}
+            </button>
+          );
+        })}
+      </div>
+
+      <AnimatePresence initial={false}>
+        {state.route === "custom" && (
+          <motion.div
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: "auto", opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            className="relative overflow-hidden"
+          >
+            <div className="mt-4 flex flex-wrap items-center gap-2 rounded-2xl bg-white/5 p-3 ring-1 ring-white/10">
+              <span className="text-xs text-white/70">Add cities in your travel order:</span>
+              {(["makkah", "madinah"] as CityId[]).map((c) => (
+                <button
+                  key={c}
+                  type="button"
+                  onClick={() => addCity(c)}
+                  disabled={state.stops.length >= BOOKING.maxStops || last === c}
+                  className="inline-flex items-center gap-1.5 rounded-full bg-cta px-3 py-1.5 text-xs font-bold text-white transition hover:bg-cta-hover disabled:opacity-40"
+                >
+                  <Plus className="size-3.5" /> {CITY_LABEL[c]}
+                </button>
+              ))}
+              <span className="text-[11px] text-white/50">Up to {BOOKING.maxStops} stops. Remove a stop with ×.</span>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* stops */}
       <div className="relative mt-8 flex flex-col items-stretch gap-0 md:flex-row md:items-center">
-        <EndpointStop icon={<PlaneTakeoff className="size-5" />} label="Depart Karachi" sub={`to ${AIRPORT[legs[0]]}`}>
+        <EndpointStop icon={<PlaneTakeoff className="size-5" />} label="Depart Karachi" sub={`to ${AIRPORT[first].code}`}>
           <label className="mt-2 flex items-center gap-2 rounded-xl bg-white/10 px-3 py-2 ring-1 ring-white/15 focus-within:ring-cta">
             <CalendarDays className="size-4 shrink-0 text-cta" />
             <input
@@ -321,41 +418,51 @@ function JourneyMap({
         </EndpointStop>
 
         <AnimatePresence initial={false} mode="popLayout">
-          {legs.map((city, i) => (
-            <Fragment key={`${i}-${city}`}>
+          {state.stops.map((stop, i) => (
+            <Fragment key={`${i}-${stop.city}`}>
               <Connector icon={i === 0 ? <Plane className="size-4" /> : <Bus className="size-4" />} />
               <motion.div
                 layout
                 initial={{ opacity: 0, scale: 0.9 }}
                 animate={{ opacity: 1, scale: 1 }}
                 exit={{ opacity: 0, scale: 0.9 }}
-                className="flex-1 rounded-2xl bg-white p-4 text-navy shadow-xl md:min-w-0"
+                className="relative flex-1 rounded-2xl bg-white p-4 text-navy shadow-xl md:min-w-0"
               >
+                {state.route === "custom" && canRemove(i) && (
+                  <button
+                    type="button"
+                    onClick={() => removeStop(i)}
+                    aria-label={`Remove stop ${i + 1}`}
+                    className="absolute -right-2 -top-2 grid size-6 place-items-center rounded-full bg-destructive text-white shadow"
+                  >
+                    <X className="size-3.5" />
+                  </button>
+                )}
                 <div className="flex items-start justify-between gap-2">
                   <div>
                     <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Stop {i + 1}</p>
-                    <p className="text-lg font-extrabold">{CITY_LABEL[city]}</p>
+                    <p className="text-lg font-extrabold">{CITY_LABEL[stop.city]}</p>
                   </div>
                   <span className="text-sm text-primary/70" lang="ar" dir="rtl">
-                    {ARABIC[city]}
+                    {ARABIC[stop.city]}
                   </span>
                 </div>
                 <div className="mt-3 flex items-center justify-between rounded-xl bg-surface px-2 py-1.5">
                   <RoundBtn
-                    label={`Fewer nights in ${CITY_LABEL[city]}`}
-                    disabled={state.nights[i] <= 1 || totalNights <= BOOKING.minNights}
-                    onClick={() => setLeg(i, state.nights[i] - 1)}
+                    label={`Fewer nights in ${CITY_LABEL[stop.city]}`}
+                    disabled={stop.nights <= 1 || totalNights <= BOOKING.minNights}
+                    onClick={() => setNights(i, stop.nights - 1)}
                   >
                     <Minus className="size-3.5" />
                   </RoundBtn>
                   <span className="text-center">
-                    <span className="block text-xl font-extrabold leading-none">{state.nights[i]}</span>
+                    <span className="block text-xl font-extrabold leading-none">{stop.nights}</span>
                     <span className="text-[10px] font-semibold uppercase text-muted-foreground">nights</span>
                   </span>
                   <RoundBtn
-                    label={`More nights in ${CITY_LABEL[city]}`}
+                    label={`More nights in ${CITY_LABEL[stop.city]}`}
                     disabled={totalNights >= BOOKING.maxNights}
-                    onClick={() => setLeg(i, state.nights[i] + 1)}
+                    onClick={() => setNights(i, stop.nights + 1)}
                   >
                     <Plus className="size-3.5" />
                   </RoundBtn>
@@ -366,11 +473,7 @@ function JourneyMap({
         </AnimatePresence>
 
         <Connector icon={<Plane className="size-4" />} />
-        <EndpointStop
-          icon={<PlaneLanding className="size-5" />}
-          label="Back in Karachi"
-          sub={`from ${AIRPORT[legs[legs.length - 1]]}`}
-        >
+        <EndpointStop icon={<PlaneLanding className="size-5" />} label="Back in Karachi" sub={`from ${AIRPORT[last].code}`}>
           <p className="mt-2 rounded-xl bg-white/5 px-3 py-2 text-xs font-semibold text-white/80 ring-1 ring-white/10">
             {dateValid ? shortDate(endDate) : "Pick a date"}
           </p>
@@ -380,17 +483,7 @@ function JourneyMap({
   );
 }
 
-function EndpointStop({
-  icon,
-  label,
-  sub,
-  children,
-}: {
-  icon: ReactNode;
-  label: string;
-  sub: string;
-  children: ReactNode;
-}) {
+function EndpointStop({ icon, label, sub, children }: { icon: ReactNode; label: string; sub: string; children: ReactNode }) {
   return (
     <div className="rounded-2xl bg-white/5 p-4 ring-1 ring-white/10 md:w-44 md:shrink-0">
       <div className="flex items-center gap-2">
@@ -440,19 +533,35 @@ function RoundBtn({
   );
 }
 
+function Stepper({
+  value,
+  min,
+  max,
+  onChange,
+  label,
+}: {
+  value: number;
+  min: number;
+  max: number;
+  onChange: (n: number) => void;
+  label: string;
+}) {
+  return (
+    <div className="flex items-center gap-2">
+      <RoundBtn label={`Fewer ${label}`} disabled={value <= min} onClick={() => onChange(value - 1)}>
+        <Minus className="size-3.5" />
+      </RoundBtn>
+      <span className="w-6 text-center font-extrabold text-navy">{value}</span>
+      <RoundBtn label={`More ${label}`} disabled={value >= max} onClick={() => onChange(value + 1)}>
+        <Plus className="size-3.5" />
+      </RoundBtn>
+    </div>
+  );
+}
+
 /* ───────────── panels ───────────── */
 
-function Panel({
-  index,
-  title,
-  subtitle,
-  children,
-}: {
-  index: string;
-  title: string;
-  subtitle: string;
-  children: ReactNode;
-}) {
+function Panel({ index, title, subtitle, children }: { index: string; title: string; subtitle: string; children: ReactNode }) {
   return (
     <section className="rounded-[2rem] border border-border bg-white p-5 md:p-8">
       <header className="mb-6 flex items-start gap-4">
@@ -467,122 +576,8 @@ function Panel({
   );
 }
 
-const COMFORT_STYLE: Record<string, string> = {
-  economy: "from-brand-cyan to-primary",
-  standard: "from-primary to-navy",
-  premium: "from-amber-500 to-cta",
-};
-
-function ComfortPicker({ state, update }: { state: PlannerState; update: Update }) {
-  const [mix, setMix] = useState(state.hotels.makkah !== state.hotels.madinah);
-  const uniform = state.hotels.makkah === state.hotels.madinah;
-
-  return (
-    <div>
-      <div className="grid gap-4 md:grid-cols-3">
-        {COMFORT_LEVELS.map((c) => {
-          const tier = HOTEL_TIERS.makkah.find((t) => t.id === c.id);
-          const active = uniform && state.hotels.makkah === c.id;
-          return (
-            <button
-              key={c.id}
-              type="button"
-              aria-pressed={active}
-              onClick={() => update({ hotels: { makkah: c.id, madinah: c.id } })}
-              className={cn(
-                "group relative overflow-hidden rounded-3xl border-2 bg-white text-left transition duration-300",
-                active ? "border-primary shadow-xl shadow-primary/15" : "border-border hover:-translate-y-1 hover:shadow-lg"
-              )}
-            >
-              <div className={cn("relative h-20 bg-gradient-to-br p-4 text-white", COMFORT_STYLE[c.id])}>
-                <span className="text-amber-200">{"★".repeat(tier?.stars ?? 3)}</span>
-                <p className="text-lg font-extrabold">{c.name}</p>
-                <Landmark className="absolute -bottom-3 -right-2 size-16 text-white/15 transition group-hover:scale-110" />
-                {active && (
-                  <motion.span
-                    layoutId="comfort-check"
-                    className="absolute right-3 top-3 grid size-6 place-items-center rounded-full bg-white text-primary"
-                  >
-                    <Check className="size-3.5" strokeWidth={3} />
-                  </motion.span>
-                )}
-              </div>
-              <div className="p-4">
-                <p className="text-xs text-muted-foreground">{c.tagline}</p>
-                <ul className="mt-3 space-y-1.5">
-                  {c.includes.map((x) => (
-                    <li key={x} className="flex items-center gap-2 text-xs font-medium text-foreground/80">
-                      <span className="size-1.5 rounded-full bg-cta" /> {x}
-                    </li>
-                  ))}
-                </ul>
-                <p className="mt-4 text-xs text-muted-foreground">
-                  Makkah from{" "}
-                  <span className="text-sm font-extrabold text-primary">{formatPKR(tier?.rates[state.sharing] ?? 0)}</span>
-                  /night
-                </p>
-              </div>
-            </button>
-          );
-        })}
-      </div>
-
-      <button
-        type="button"
-        onClick={() => setMix((v) => !v)}
-        aria-expanded={mix}
-        className="mt-4 inline-flex items-center gap-2 text-sm font-semibold text-primary"
-      >
-        <Shuffle className="size-4" />
-        {mix ? "Hide per-city hotels" : "Mix & match hotels per city"}
-      </button>
-
-      <AnimatePresence initial={false}>
-        {mix && (
-          <motion.div
-            initial={{ height: 0, opacity: 0 }}
-            animate={{ height: "auto", opacity: 1 }}
-            exit={{ height: 0, opacity: 0 }}
-            className="overflow-hidden"
-          >
-            <div className="mt-4 grid gap-3 md:grid-cols-2">
-              {(["makkah", "madinah"] as CityId[]).map((city) => {
-                const tier = HOTEL_TIERS[city].find((t) => t.id === state.hotels[city]);
-                return (
-                  <div key={city} className="rounded-2xl bg-surface p-4">
-                    <div className="flex items-center justify-between">
-                      <p className="text-sm font-bold text-navy">{CITY_LABEL[city]}</p>
-                      {tier && <Stars count={tier.stars} />}
-                    </div>
-                    <div className="mt-2 grid grid-cols-3 gap-1 rounded-xl bg-white p-1 ring-1 ring-border">
-                      {HOTEL_TIERS[city].map((t) => (
-                        <button
-                          key={t.id}
-                          type="button"
-                          aria-pressed={state.hotels[city] === t.id}
-                          onClick={() => update({ hotels: { ...state.hotels, [city]: t.id } })}
-                          className={cn(
-                            "rounded-lg px-2 py-2 text-xs font-semibold transition",
-                            state.hotels[city] === t.id ? "bg-primary text-white" : "text-foreground/70 hover:bg-secondary"
-                          )}
-                        >
-                          {t.name}
-                        </button>
-                      ))}
-                    </div>
-                    <p className="mt-2 text-xs text-muted-foreground">
-                      {tier?.distance} · {formatPKR(tier?.rates[state.sharing] ?? 0)}/night
-                    </p>
-                  </div>
-                );
-              })}
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-    </div>
-  );
-}
+const selectCls =
+  "h-11 w-full rounded-xl border border-border bg-white px-3 text-sm font-semibold text-navy outline-none transition focus:border-primary focus:ring-4 focus:ring-primary/10";
 
 function Travellers({ state, update }: { state: PlannerState; update: Update }) {
   const rows: {
@@ -594,12 +589,11 @@ function Travellers({ state, update }: { state: PlannerState; update: Update }) 
     size: string;
   }[] = [
     { key: "adults", label: "Adults", hint: "12+ years", min: 1, max: BOOKING.maxTravellers, size: "size-5" },
-    { key: "children", label: "Children", hint: "2–11 · half hotel", min: 0, max: 20, size: "size-4" },
-    { key: "infants", label: "Infants", hint: "Under 2 · no bed", min: 0, max: 10, size: "size-3.5" },
+    { key: "children", label: "Children", hint: "2–11 years", min: 0, max: 20, size: "size-4" },
+    { key: "infants", label: "Infants", hint: "Under 2 · on lap", min: 0, max: Math.min(10, state.adults), size: "size-3.5" },
   ];
-  const sharers = state.adults + state.children;
-  const perRoom = SHARING_OPTIONS.find((s) => s.id === state.sharing)?.perRoom ?? 4;
-  const rooms = Math.ceil(sharers / perRoom);
+  const guests = seated(state);
+  const rooms = roomCount(suggestRooms(guests, state.roomPref));
 
   return (
     <div className="grid gap-6 xl:grid-cols-[1.2fr_1fr]">
@@ -630,148 +624,454 @@ function Travellers({ state, update }: { state: PlannerState; update: Update }) 
                 {n > 10 && <span className="ml-1 text-xs font-bold text-primary">+{n - 10}</span>}
                 {n === 0 && <span className="text-xs text-muted-foreground">None</span>}
               </div>
-              <div className="flex items-center gap-2">
-                <RoundBtn label={`Remove one from ${r.label}`} disabled={n <= r.min} onClick={() => update({ [r.key]: n - 1 })}>
-                  <Minus className="size-3.5" />
-                </RoundBtn>
-                <span className="w-6 text-center font-extrabold text-navy">{n}</span>
-                <RoundBtn label={`Add one to ${r.label}`} disabled={n >= r.max} onClick={() => update({ [r.key]: n + 1 })}>
-                  <Plus className="size-3.5" />
-                </RoundBtn>
+              <Stepper value={n} min={r.min} max={r.max} label={r.label.toLowerCase()} onChange={(v) => update({ [r.key]: v })} />
+            </div>
+          );
+        })}
+
+        <AnimatePresence initial={false}>
+          {state.children > 0 && (
+            <motion.div
+              initial={{ height: 0, opacity: 0 }}
+              animate={{ height: "auto", opacity: 1 }}
+              exit={{ height: 0, opacity: 0 }}
+              className="overflow-hidden"
+            >
+              <div className="rounded-2xl border border-dashed border-primary/30 p-3">
+                <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Child ages</p>
+                <div className="mt-2 grid grid-cols-3 gap-2 sm:grid-cols-4">
+                  {state.childAges.map((age, i) => (
+                    <label key={i} className="block">
+                      <span className="sr-only">Age of child {i + 1}</span>
+                      <select
+                        value={age}
+                        onChange={(e) =>
+                          update({ childAges: state.childAges.map((a, j) => (j === i ? Number(e.target.value) : a)) })
+                        }
+                        className={cn(selectCls, "h-10")}
+                      >
+                        {Array.from({ length: 10 }, (_, k) => k + 2).map((a) => (
+                          <option key={a} value={a}>
+                            Child {i + 1}: {a} yrs
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                  ))}
+                </div>
               </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
+
+      <div className="space-y-5">
+        <label className="block">
+          <span className="mb-2 block text-xs font-semibold uppercase tracking-wider text-muted-foreground">Nationality</span>
+          <select value={state.nationality} onChange={(e) => update({ nationality: e.target.value })} className={selectCls}>
+            {NATIONALITIES.map((n) => (
+              <option key={n}>{n}</option>
+            ))}
+          </select>
+        </label>
+
+        <div>
+          <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">Preferred room</p>
+          <div className="grid grid-cols-3 gap-2">
+            {ROOM_TYPES.map((r) => {
+              const active = state.roomPref === r.id;
+              return (
+                <button
+                  key={r.id}
+                  type="button"
+                  aria-pressed={active}
+                  onClick={() => update({ roomPref: r.id })}
+                  className={cn(
+                    "rounded-2xl border-2 p-3 text-left transition",
+                    active ? "border-primary bg-secondary/60" : "border-border hover:border-primary/40"
+                  )}
+                >
+                  <span className="block text-sm font-bold text-navy">{r.label}</span>
+                  <span className="text-[11px] text-muted-foreground">{r.guests} beds</span>
+                </button>
+              );
+            })}
+          </div>
+          <p className="mt-3 rounded-xl bg-secondary/60 px-3 py-2 text-xs font-semibold text-primary">
+            ≈ {rooms} room{rooms > 1 ? "s" : ""} per stop for {guests} guest{guests > 1 ? "s" : ""}. Fine-tune each
+            hotel below.
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function Hotels({ state, update }: { state: PlannerState; update: Update }) {
+  const guests = seated(state);
+
+  const setStop = (i: number, patch: Partial<Stop>, custom = true) =>
+    update({
+      stops: state.stops.map((s, j) => (j === i ? { ...s, ...patch } : s)),
+      ...(custom ? { comfort: "custom" as const } : {}),
+    });
+
+  const applyComfort = (c: ComfortId) =>
+    update({
+      comfort: c,
+      stops: state.stops.map((s) => ({
+        ...s,
+        hotelId: pickHotel(s.city, c).id,
+        rooms: s.hotelId ? s.rooms : suggestRooms(guests, state.roomPref),
+      })),
+    });
+
+  return (
+    <div>
+      <div className="flex flex-wrap items-center gap-2">
+        <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Quick pick:</span>
+        {COMFORT_LEVELS.map((c) => (
+          <button
+            key={c.id}
+            type="button"
+            title={c.tagline}
+            aria-pressed={state.comfort === c.id}
+            onClick={() => applyComfort(c.id)}
+            className={cn(
+              "rounded-full border px-4 py-1.5 text-sm font-semibold transition",
+              state.comfort === c.id ? "border-primary bg-primary text-white" : "border-border text-navy hover:border-primary/50"
+            )}
+          >
+            {c.name}
+          </button>
+        ))}
+        {state.comfort === "custom" && (
+          <span className="rounded-full bg-cta/10 px-3 py-1.5 text-xs font-bold text-cta">Custom selection</span>
+        )}
+      </div>
+
+      <div className="mt-5 space-y-4">
+        {state.stops.map((stop, i) => {
+          const hotel = hotelById(stop.hotelId);
+          const beds = bedsIn(stop.rooms);
+          const included = breakfastIncluded(hotel);
+          const stayCost = hotel ? ROOM_TYPES.reduce((s, r) => s + stop.rooms[r.id] * hotel.rates[r.id], 0) * stop.nights : 0;
+          return (
+            <div key={`${i}-${stop.city}`} className="rounded-3xl border border-border p-4 md:p-5">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <p className="flex items-center gap-2 font-bold text-navy">
+                  <span className="grid size-8 place-items-center rounded-full bg-primary text-xs text-white">{i + 1}</span>
+                  {CITY_LABEL[stop.city]}
+                  <span className="text-sm font-medium text-muted-foreground">· {stop.nights} nights</span>
+                </p>
+                <label className="flex cursor-pointer items-center gap-2 text-xs font-semibold text-navy">
+                  <input
+                    type="checkbox"
+                    checked={!hotel}
+                    onChange={(e) =>
+                      setStop(i, {
+                        hotelId: e.target.checked ? null : pickHotel(stop.city, state.comfort === "custom" ? "standard" : state.comfort).id,
+                        rooms: suggestRooms(guests, state.roomPref),
+                      })
+                    }
+                    className="size-4 accent-[var(--color-primary)]"
+                  />
+                  Skip hotel (transit only)
+                </label>
+              </div>
+
+              {hotel ? (
+                <>
+                  <label className="mt-4 block">
+                    <span className="sr-only">Hotel in {CITY_LABEL[stop.city]}</span>
+                    <select value={hotel.id} onChange={(e) => setStop(i, { hotelId: e.target.value })} className={selectCls}>
+                      {hotelsIn(stop.city).map((h) => (
+                        <option key={h.id} value={h.id}>
+                          {h.name} · {h.stars}★ · {formatDistance(h.distanceM)} · from {formatPKR(Math.min(...Object.values(h.rates)))}/night
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
+                    <Stars count={hotel.stars} />
+                    <span className="flex items-center gap-1">
+                      {hotel.shuttle ? <Bus className="size-3.5" /> : <Footprints className="size-3.5" />}
+                      {formatDistance(hotel.distanceM)} · {hotel.shuttle ? "shuttle" : `~${walkMinutes(hotel.distanceM)} min walk`}
+                    </span>
+                    <span>{hotel.area}</span>
+                  </div>
+
+                  <div className="mt-4 grid gap-2 sm:grid-cols-3">
+                    {ROOM_TYPES.map((r) => (
+                      <div key={r.id} className="flex items-center justify-between rounded-2xl bg-surface p-2.5 pl-3">
+                        <div>
+                          <p className="text-sm font-bold text-navy">{r.label}</p>
+                          <p className="text-[11px] text-muted-foreground">{formatPKR(hotel.rates[r.id])}/night</p>
+                        </div>
+                        <Stepper
+                          value={stop.rooms[r.id]}
+                          min={0}
+                          max={20}
+                          label={`${r.label.toLowerCase()} rooms`}
+                          onChange={(v) => setStop(i, { rooms: { ...stop.rooms, [r.id]: v } }, false)}
+                        />
+                      </div>
+                    ))}
+                  </div>
+
+                  <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
+                    <p
+                      className={cn(
+                        "flex items-center gap-1.5 text-xs font-semibold",
+                        beds < guests ? "text-destructive" : "text-primary"
+                      )}
+                    >
+                      {beds < guests ? <TriangleAlert className="size-3.5" /> : <BedDouble className="size-3.5" />}
+                      {roomCount(stop.rooms)} room{roomCount(stop.rooms) === 1 ? "" : "s"} · {beds} beds for {guests} guest{guests === 1 ? "" : "s"}
+                      {beds < guests && " — add a room"}
+                    </p>
+                    {included ? (
+                      <span className="flex items-center gap-1.5 rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700">
+                        <Coffee className="size-3.5" /> Breakfast included
+                      </span>
+                    ) : (
+                      <button
+                        type="button"
+                        aria-pressed={stop.breakfast}
+                        onClick={() => setStop(i, { breakfast: !stop.breakfast }, false)}
+                        className={cn(
+                          "flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-semibold transition",
+                          stop.breakfast ? "border-cta bg-cta text-white" : "border-border text-navy hover:border-cta/50"
+                        )}
+                      >
+                        <Coffee className="size-3.5" />
+                        Add breakfast · {formatPKR(BREAKFAST_PER_PERSON_NIGHT)}/person/night
+                      </button>
+                    )}
+                  </div>
+                  <p className="mt-3 text-right text-sm text-muted-foreground">
+                    Stay: <span className="font-extrabold text-navy">{formatPKR(stayCost)}</span>
+                  </p>
+                </>
+              ) : (
+                <p className="mt-3 rounded-2xl bg-surface px-4 py-3 text-sm text-muted-foreground">
+                  No hotel at this stop — useful if you&apos;re staying with family or only passing through.
+                </p>
+              )}
             </div>
           );
         })}
       </div>
+    </div>
+  );
+}
 
-      <div>
-        <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">Room sharing</p>
-        <div className="grid grid-cols-2 gap-2">
-          {SHARING_OPTIONS.map((s) => {
-            const active = state.sharing === s.id;
+function Transport({ state, update }: { state: PlannerState; update: Update }) {
+  const guests = seated(state);
+  const transfers = transfersFor(state.stops);
+  const rate = (routeId: string, v: VehicleId) => transportRoutes.find((r) => r.id === routeId)!.rates[v];
+  const tripCost = (v: VehicleId) => transfers.reduce((s, t) => s + rate(t.routeId, v), 0);
+  const best = bestVehicle(guests);
+
+  const setMode = (mode: "full" | "selective") => {
+    if (mode === "selective" && !Object.keys(state.legVehicles).length) {
+      update({
+        transportMode: mode,
+        legVehicles: Object.fromEntries(transfers.map((t) => [t.id, state.vehicleId])),
+      });
+    } else update({ transportMode: mode });
+  };
+
+  return (
+    <div>
+      <div className="grid gap-2 sm:grid-cols-2" role="radiogroup" aria-label="Transport type">
+        {(
+          [
+            ["full", "Full transport", "One vehicle type for every airport and intercity transfer."],
+            ["selective", "Selective transport", "Choose a vehicle per route. Routes left empty aren't charged."],
+          ] as const
+        ).map(([id, title, text]) => (
+          <button
+            key={id}
+            type="button"
+            role="radio"
+            aria-checked={state.transportMode === id}
+            onClick={() => setMode(id)}
+            className={cn(
+              "rounded-2xl border-2 p-4 text-left transition",
+              state.transportMode === id ? "border-primary bg-secondary/50" : "border-border hover:border-primary/40"
+            )}
+          >
+            <span className="flex items-center gap-2 text-sm font-bold text-navy">
+              {id === "full" ? <Car className="size-4 text-primary" /> : <Route className="size-4 text-primary" />}
+              {title}
+            </span>
+            <span className="mt-1 block text-xs text-muted-foreground">{text}</span>
+          </button>
+        ))}
+      </div>
+
+      {state.transportMode === "full" ? (
+        <>
+          <div className="mt-5 space-y-2.5">
+            {transportVehicles.map((v) => {
+              const active = state.vehicleId === v.id;
+              const cars = carsNeeded(v, guests);
+              return (
+                <button
+                  key={v.id}
+                  type="button"
+                  aria-pressed={active}
+                  onClick={() => update({ vehicleId: v.id })}
+                  className={cn(
+                    "flex w-full items-center gap-3 rounded-2xl border-2 p-3 text-left transition md:gap-4 md:p-4",
+                    active ? "border-primary bg-secondary/50" : "border-border hover:border-primary/40"
+                  )}
+                >
+                  <span
+                    className={cn(
+                      "grid size-11 shrink-0 place-items-center rounded-xl transition",
+                      active ? "bg-primary text-white" : "bg-surface text-primary"
+                    )}
+                  >
+                    {v.seats > 7 ? <Bus className="size-5" /> : <Car className="size-5" />}
+                  </span>
+                  <span className="min-w-0 flex-1">
+                    <span className="flex flex-wrap items-center gap-2">
+                      <span className="text-sm font-bold text-navy">{v.name}</span>
+                      <span className="text-xs text-muted-foreground">{v.model}</span>
+                      {v.id === best && (
+                        <span className="rounded-full bg-cta/15 px-2 py-0.5 text-[10px] font-bold uppercase text-cta">Best fit</span>
+                      )}
+                    </span>
+                    <span className="mt-0.5 block text-[11px] text-muted-foreground">
+                      {v.seats} seats · {v.bags} bags{cars > 1 ? ` · needs ${cars} cars for ${guests}` : ""}
+                    </span>
+                  </span>
+                  <span className="shrink-0 text-right">
+                    <span className="block text-sm font-extrabold text-primary">{formatPKR(tripCost(v.id) * cars)}</span>
+                    <span className="text-[10px] text-muted-foreground">{transfers.length} transfers</span>
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+          <div className="mt-4 flex items-center justify-between rounded-2xl bg-surface p-3 pl-4">
+            <div>
+              <p className="text-sm font-bold text-navy">Number of cars</p>
+              <p className="text-[11px] text-muted-foreground">
+                At least {carsNeeded(vehicleById(state.vehicleId), guests)} for {guests} guests
+              </p>
+            </div>
+            <Stepper
+              value={state.cars}
+              min={carsNeeded(vehicleById(state.vehicleId), guests)}
+              max={10}
+              label="cars"
+              onChange={(cars) => update({ cars })}
+            />
+          </div>
+        </>
+      ) : (
+        <div className="mt-5 space-y-2.5">
+          {transfers.map((t) => {
+            const id = state.legVehicles[t.id] ?? "";
+            const cars = id ? carsNeeded(vehicleById(id), guests) : 0;
             return (
-              <button
-                key={s.id}
-                type="button"
-                aria-pressed={active}
-                onClick={() => update({ sharing: s.id })}
-                className={cn(
-                  "rounded-2xl border-2 p-3 text-left transition",
-                  active ? "border-primary bg-secondary/60" : "border-border hover:border-primary/40"
-                )}
-              >
-                <span className="flex gap-0.5 text-primary" aria-hidden>
-                  {Array.from({ length: s.perRoom }).map((_, i) => (
-                    <BedSingle key={i} className="size-4" />
+              <div key={t.id} className="grid items-center gap-2 rounded-2xl border border-border p-3 md:grid-cols-[1fr_220px_110px]">
+                <p className="flex items-center gap-2 text-sm font-semibold text-navy">
+                  <Route className="size-4 shrink-0 text-primary" />
+                  {t.label}
+                </p>
+                <select
+                  value={id}
+                  onChange={(e) => update({ legVehicles: { ...state.legVehicles, [t.id]: e.target.value as VehicleId | "" } })}
+                  className={cn(selectCls, "h-10")}
+                  aria-label={`Vehicle for ${t.label}`}
+                >
+                  <option value="">No vehicle</option>
+                  {transportVehicles.map((v) => (
+                    <option key={v.id} value={v.id}>
+                      {v.name} ({v.seats} seats)
+                    </option>
                   ))}
-                </span>
-                <span className="mt-2 block text-sm font-bold text-navy">{s.label}</span>
-                <span className="text-[11px] text-muted-foreground">{s.perRoom} beds per room</span>
-              </button>
+                </select>
+                <p className="text-right text-sm font-extrabold text-primary">
+                  {id ? (
+                    <>
+                      {formatPKR(rate(t.routeId, id) * cars)}
+                      {cars > 1 && <span className="block text-[10px] font-medium text-muted-foreground">{cars} cars</span>}
+                    </>
+                  ) : (
+                    <span className="text-xs font-medium text-muted-foreground">Not charged</span>
+                  )}
+                </p>
+              </div>
             );
           })}
         </div>
-        <p className="mt-3 rounded-xl bg-secondary/60 px-3 py-2 text-xs font-semibold text-primary">
-          ≈ {rooms} room{rooms > 1 ? "s" : ""} for {sharers} guest{sharers > 1 ? "s" : ""}
-        </p>
-      </div>
+      )}
     </div>
   );
 }
 
-function Transport({ state, update, travellers }: { state: PlannerState; update: Update; travellers: number }) {
-  const best = VEHICLES.find((v) => !v.perPerson && v.capacity >= travellers)?.id;
+function Extras({ state, update }: { state: PlannerState; update: Update }) {
+  const guests = seated(state);
+  const travellers = guests + state.infants;
+  const cities = [...new Set(state.stops.map((s) => s.city))];
+  const zVehicle = state.transportMode === "full" ? vehicleById(state.vehicleId) : vehicleById(bestVehicle(guests));
+  const zCars = state.transportMode === "full" ? state.cars : carsNeeded(zVehicle, guests);
+  const zPrice = (c: CityId) =>
+    transportRoutes.find((r) => r.id === ZIARAAT_ROUTE[c])!.rates[zVehicle.id] * zCars;
+
   return (
-    <div>
-      <div className="space-y-2.5">
-        {VEHICLES.map((v) => {
-          const tooSmall = v.capacity < travellers;
-          const fill = v.perPerson ? 1 : Math.min(travellers / v.capacity, 1);
-          const active = state.vehicleId === v.id;
-          return (
-            <button
-              key={v.id}
-              type="button"
-              aria-pressed={active}
-              disabled={tooSmall}
-              onClick={() => update({ vehicleId: v.id })}
-              className={cn(
-                "flex w-full items-center gap-3 rounded-2xl border-2 p-3 text-left transition md:gap-4 md:p-4",
-                active ? "border-primary bg-secondary/50" : "border-border hover:border-primary/40",
-                tooSmall && "cursor-not-allowed opacity-45 hover:border-border"
-              )}
-            >
-              <span
-                className={cn(
-                  "grid size-11 shrink-0 place-items-center rounded-xl transition",
-                  active ? "bg-primary text-white" : "bg-surface text-primary"
-                )}
-              >
-                <Bus className="size-5" />
-              </span>
-              <span className="min-w-0 flex-1">
-                <span className="flex flex-wrap items-center gap-2">
-                  <span className="text-sm font-bold text-navy">{v.name}</span>
-                  {v.id === best && (
-                    <span className="rounded-full bg-cta/15 px-2 py-0.5 text-[10px] font-bold uppercase text-cta">
-                      Best fit
-                    </span>
-                  )}
-                </span>
-                <span className="mt-1.5 block h-2 overflow-hidden rounded-full bg-surface">
-                  <motion.span
-                    className={cn("block h-full rounded-full", tooSmall ? "bg-destructive" : "bg-brand-cyan")}
-                    initial={false}
-                    animate={{ width: `${fill * 100}%` }}
-                    transition={{ duration: 0.4 }}
-                  />
-                </span>
-                <span className="mt-1 block text-[11px] text-muted-foreground">
-                  {v.perPerson
-                    ? "Shared seats · any group size"
-                    : tooSmall
-                      ? `Only ${v.capacity} seats — you need ${travellers}`
-                      : `${travellers} of ${v.capacity} seats used`}
-                </span>
-              </span>
-              <span className="shrink-0 text-right">
-                <span className="block text-sm font-extrabold text-primary">{formatPKR(v.price)}</span>
-                <span className="text-[10px] text-muted-foreground">{v.perPerson ? "per person" : "per package"}</span>
-              </span>
-            </button>
-          );
-        })}
-      </div>
-
-      <p className="mb-2 mt-6 text-xs font-semibold uppercase tracking-wider text-muted-foreground">Extras</p>
-      <div className="flex flex-wrap gap-2">
-        <ExtraChip
-          active={state.ziaraat}
-          onClick={() => update({ ziaraat: !state.ziaraat })}
-          label="Guided ziaraat"
-          price={`${formatPKR(ADDONS.ziaraat.perPerson)}/person`}
+    <div className="grid gap-3 md:grid-cols-2">
+      <ExtraCard
+        icon={<Stamp className="size-5" />}
+        active={state.visa}
+        onClick={() => update({ visa: !state.visa })}
+        title="Umrah visa processing"
+        text={
+          state.nationality === "Pakistan"
+            ? `${formatPKR(VISA_FEE)} per person · ${travellers} travellers`
+            : `${formatPKR(VISA_FEE)} per person · rules for ${state.nationality} passports confirmed by our team`
+        }
+      />
+      <ExtraCard
+        icon={<Plane className="size-5" />}
+        active={state.flights}
+        onClick={() => update({ flights: !state.flights })}
+        title="Return flights from Karachi"
+        text={`Estimate from ${formatPKR(FLIGHTS.adult)} per adult`}
+      />
+      {cities.map((c) => (
+        <ExtraCard
+          key={c}
+          icon={<Landmark className="size-5" />}
+          active={state.ziaraat.includes(c)}
+          onClick={() =>
+            update({ ziaraat: state.ziaraat.includes(c) ? state.ziaraat.filter((x) => x !== c) : [...state.ziaraat, c] })
+          }
+          title={`${CITY_LABEL[c]} ziaraat tour`}
+          text={`${formatPKR(zPrice(c))} · ${zCars} × ${zVehicle.name}, guided`}
         />
-        <ExtraChip
-          active={state.flights}
-          onClick={() => update({ flights: !state.flights })}
-          label="Return flights"
-          price={`from ${formatPKR(ADDONS.flights.adult)}`}
-        />
-      </div>
+      ))}
     </div>
   );
 }
 
-function ExtraChip({
+function ExtraCard({
+  icon,
   active,
   onClick,
-  label,
-  price,
+  title,
+  text,
 }: {
+  icon: ReactNode;
   active: boolean;
   onClick: () => void;
-  label: string;
-  price: string;
+  title: string;
+  text: string;
 }) {
   return (
     <button
@@ -779,15 +1079,20 @@ function ExtraChip({
       aria-pressed={active}
       onClick={onClick}
       className={cn(
-        "inline-flex items-center gap-2 rounded-full border-2 px-4 py-2 text-sm font-semibold transition",
-        active ? "border-cta bg-cta text-white" : "border-border text-navy hover:border-cta/50"
+        "flex items-start gap-3 rounded-2xl border-2 p-4 text-left transition",
+        active ? "border-cta bg-cta/5" : "border-border hover:border-cta/40"
       )}
     >
-      <span className={cn("grid size-4 place-items-center rounded-full", active ? "bg-white text-cta" : "ring-1 ring-border")}>
+      <span className={cn("grid size-10 shrink-0 place-items-center rounded-xl", active ? "bg-cta text-white" : "bg-surface text-primary")}>
+        {icon}
+      </span>
+      <span className="flex-1">
+        <span className="block text-sm font-bold text-navy">{title}</span>
+        <span className="mt-0.5 block text-xs text-muted-foreground">{text}</span>
+      </span>
+      <span className={cn("grid size-5 shrink-0 place-items-center rounded-md border-2", active ? "border-cta bg-cta text-white" : "border-border")}>
         {active && <Check className="size-3" strokeWidth={3} />}
       </span>
-      {label}
-      <span className={cn("text-xs", active ? "text-white/80" : "text-muted-foreground")}>{price}</span>
     </button>
   );
 }
@@ -802,6 +1107,7 @@ function BoardingPass({
   travellers,
   endDate,
   dateValid,
+  shortOnBeds,
   summaryText,
   onRequest,
 }: {
@@ -812,11 +1118,12 @@ function BoardingPass({
   travellers: number;
   endDate: string;
   dateValid: boolean;
+  shortOnBeds: boolean;
   summaryText: string;
   onRequest: () => void;
 }) {
   const [showFare, setShowFare] = useState(false);
-  const legs = buildLegs(state.startCity, state.roundTrip);
+  const first = state.stops[0].city;
 
   return (
     <div className="relative drop-shadow-xl">
@@ -836,8 +1143,8 @@ function BoardingPass({
             <span className="h-0 flex-1 border-t-2 border-dashed border-white/30" />
           </div>
           <div className="text-right">
-            <p className="text-3xl font-extrabold">{AIRPORT[legs[0]]}</p>
-            <p className="text-[11px] text-white/60">{legs.map((c) => CITY_LABEL[c]).join(" · ")}</p>
+            <p className="text-3xl font-extrabold">{AIRPORT[first].code}</p>
+            <p className="text-[11px] text-white/60">{state.stops.map((s) => CITY_LABEL[s.city]).join(" · ")}</p>
           </div>
         </div>
         <dl className="mt-5 grid grid-cols-3 gap-3 text-xs">
@@ -845,8 +1152,8 @@ function BoardingPass({
           <PassField label="Return" value={dateValid ? shortDate(endDate) : "—"} />
           <PassField label="Nights" value={String(totalNights)} />
           <PassField label="Pilgrims" value={String(travellers)} />
-          <PassField label="Comfort" value={comfort} />
-          <PassField label="Room" value={state.sharing} />
+          <PassField label="Hotels" value={comfort} />
+          <PassField label="Transport" value={state.transportMode} />
         </dl>
       </div>
 
@@ -861,6 +1168,13 @@ function BoardingPass({
         <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-muted-foreground">Estimated total</p>
         <AnimatedPKR value={quote.total} className="text-3xl font-extrabold text-navy" />
         <p className="text-xs text-muted-foreground">≈ {formatPKR(quote.perPerson)} per person</p>
+
+        {shortOnBeds && (
+          <p className="mt-3 flex gap-2 rounded-xl bg-destructive/10 px-3 py-2 text-[11px] font-medium text-destructive">
+            <TriangleAlert className="mt-0.5 size-3.5 shrink-0" />
+            Some hotels don&apos;t have enough beds for your group yet.
+          </p>
+        )}
 
         <button
           type="button"
@@ -879,14 +1193,11 @@ function BoardingPass({
               exit={{ height: 0, opacity: 0 }}
               className="overflow-hidden"
             >
-              {quote.lines.map((l) => (
-                <li
-                  key={l.label}
-                  className="flex justify-between gap-3 border-b border-dashed border-border py-2 text-xs last:border-0"
-                >
+              {quote.lines.map((l, i) => (
+                <li key={`${l.label}-${i}`} className="flex justify-between gap-3 border-b border-dashed border-border py-2 text-xs last:border-0">
                   <span>
                     <span className="block font-semibold text-navy">{l.label}</span>
-                    <span className="capitalize text-muted-foreground">{l.detail}</span>
+                    <span className="text-muted-foreground">{l.detail}</span>
                   </span>
                   <span className="whitespace-nowrap font-semibold text-navy">{formatPKR(l.amount)}</span>
                 </li>
