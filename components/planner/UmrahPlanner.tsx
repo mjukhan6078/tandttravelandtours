@@ -1,6 +1,6 @@
 "use client";
 
-import { Fragment, useEffect, useMemo, useState, type FormEvent, type ReactNode } from "react";
+import { Fragment, useCallback, useEffect, useMemo, useState, type FormEvent, type ReactNode } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import {
   BedDouble,
@@ -11,7 +11,6 @@ import {
   ChevronUp,
   CircleCheck,
   Coffee,
-  Footprints,
   Info,
   Landmark,
   LoaderCircle,
@@ -48,7 +47,6 @@ import {
   defaultNights,
   formatPKR,
   hotelById,
-  hotelsIn,
   pickHotel,
   roomCount,
   seated,
@@ -61,11 +59,12 @@ import {
   type RouteId,
   type Stop,
 } from "@/lib/site/pricing";
-import { ROOM_TYPES, formatDistance, walkMinutes, type RoomType } from "@/lib/site/hotels";
+import { ROOM_TYPES, type RoomType } from "@/lib/site/hotels";
 import { transportRoutes, transportVehicles, type VehicleId } from "@/lib/site/transport";
 import { waLink } from "@/lib/site/contact";
 import { WhatsAppIcon } from "@/components/site/icons";
-import { AnimatedPKR, Stars } from "./PlannerParts";
+import { HotelPickerModal, HotelSummary } from "./HotelPicker";
+import { AnimatedPKR } from "./PlannerParts";
 import { cn } from "@/lib/utils";
 
 /* ───────────── helpers ───────────── */
@@ -639,20 +638,21 @@ function Travellers({ state, update }: { state: PlannerState; update: Update }) 
             >
               <div className="rounded-2xl border border-dashed border-primary/30 p-3">
                 <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Child ages</p>
-                <div className="mt-2 grid grid-cols-3 gap-2 sm:grid-cols-4">
+                <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-4">
                   {state.childAges.map((age, i) => (
                     <label key={i} className="block">
-                      <span className="sr-only">Age of child {i + 1}</span>
+                      <span className="mb-1 block text-[11px] font-semibold text-navy">Child {i + 1}</span>
                       <select
                         value={age}
                         onChange={(e) =>
                           update({ childAges: state.childAges.map((a, j) => (j === i ? Number(e.target.value) : a)) })
                         }
                         className={cn(selectCls, "h-10")}
+                        aria-label={`Age of child ${i + 1}`}
                       >
                         {Array.from({ length: 10 }, (_, k) => k + 2).map((a) => (
                           <option key={a} value={a}>
-                            Child {i + 1}: {a} yrs
+                            {a} years
                           </option>
                         ))}
                       </select>
@@ -709,6 +709,8 @@ function Travellers({ state, update }: { state: PlannerState; update: Update }) 
 
 function Hotels({ state, update }: { state: PlannerState; update: Update }) {
   const guests = seated(state);
+  const [picking, setPicking] = useState<number | null>(null);
+  const closePicker = useCallback(() => setPicking(null), []);
 
   const setStop = (i: number, patch: Partial<Stop>, custom = true) =>
     update({
@@ -782,24 +784,7 @@ function Hotels({ state, update }: { state: PlannerState; update: Update }) {
 
               {hotel ? (
                 <>
-                  <label className="mt-4 block">
-                    <span className="sr-only">Hotel in {CITY_LABEL[stop.city]}</span>
-                    <select value={hotel.id} onChange={(e) => setStop(i, { hotelId: e.target.value })} className={selectCls}>
-                      {hotelsIn(stop.city).map((h) => (
-                        <option key={h.id} value={h.id}>
-                          {h.name} · {h.stars}★ · {formatDistance(h.distanceM)} · from {formatPKR(Math.min(...Object.values(h.rates)))}/night
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-                  <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
-                    <Stars count={hotel.stars} />
-                    <span className="flex items-center gap-1">
-                      {hotel.shuttle ? <Bus className="size-3.5" /> : <Footprints className="size-3.5" />}
-                      {formatDistance(hotel.distanceM)} · {hotel.shuttle ? "shuttle" : `~${walkMinutes(hotel.distanceM)} min walk`}
-                    </span>
-                    <span>{hotel.area}</span>
-                  </div>
+                  <HotelSummary hotel={hotel} onChange={() => setPicking(i)} />
 
                   <div className="mt-4 grid gap-2 sm:grid-cols-3">
                     {ROOM_TYPES.map((r) => (
@@ -862,6 +847,16 @@ function Hotels({ state, update }: { state: PlannerState; update: Update }) {
           );
         })}
       </div>
+
+      {picking !== null && state.stops[picking] && (
+        <HotelPickerModal
+          city={state.stops[picking].city}
+          open
+          selectedId={state.stops[picking].hotelId}
+          onSelect={(id) => setStop(picking, { hotelId: id })}
+          onClose={closePicker}
+        />
+      )}
     </div>
   );
 }

@@ -21,12 +21,3 @@ export function AnimatedPKR({ value, className }: { value: number; className?: s
 
   return <span className={className}>{formatPKR(display)}</span>;
 }
-
-export function Stars({ count }: { count: number }) {
-  return (
-    <span className="text-xs text-cta" aria-label={`${count} star`}>
-      {"★".repeat(count)}
-      <span className="text-border">{"★".repeat(5 - count)}</span>
-    </span>
-  );
-}

@@ -203,9 +203,16 @@ function RouteStrip({ route }: { route: TransportRoute }) {
         transition={{ duration: 0.25 }}
         className="mt-5 rounded-3xl bg-gradient-to-br from-navy to-primary p-6 text-white md:p-8"
       >
-        <div className="flex items-center gap-3 md:gap-5">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center md:gap-5">
           <Stop label="From" place={route.from} />
-          <div className="relative flex-1">
+          {/* Phones: vertical connector */}
+          <div className="flex items-center gap-3 pl-1 sm:hidden" aria-hidden>
+            <span className="h-8 border-l-2 border-dashed border-white/30" />
+            <span className="grid size-8 place-items-center rounded-full bg-cta shadow-lg shadow-cta/40">
+              <Car className="size-4" />
+            </span>
+          </div>
+          <div className="relative hidden flex-1 sm:block">
             <div className="h-0.5 w-full border-t-2 border-dashed border-white/30" />
             <motion.span
               initial={{ left: "0%" }}
@@ -241,12 +248,12 @@ function RouteStrip({ route }: { route: TransportRoute }) {
 
 function Stop({ label, place, alignEnd }: { label: string; place: string; alignEnd?: boolean }) {
   return (
-    <div className={cn("max-w-[40%] shrink-0", alignEnd && "text-right")}>
+    <div className={cn("shrink-0 sm:max-w-[40%]", alignEnd && "sm:text-right")}>
       <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-cta">{label}</p>
       <p
         className={cn(
           "mt-1 flex items-center gap-1.5 text-base font-bold md:text-xl",
-          alignEnd && "justify-end",
+          alignEnd && "sm:justify-end",
         )}
       >
         <MapPin className="hidden size-4 shrink-0 sm:block" />
@@ -335,7 +342,7 @@ function VehicleCard({
         </ul>
 
         <div className="mt-auto pt-6">
-          <div className="flex items-end justify-between gap-3">
+          <div className="flex flex-wrap items-end justify-between gap-3">
             <div>
               <p className="text-xs text-muted-foreground">
                 {route.group === "ziaraat" ? "Per vehicle, full tour" : "Per vehicle, one way"}
@@ -358,7 +365,7 @@ function VehicleCard({
               <button
                 type="button"
                 onClick={() => openWith({ interest: "Transport", message })}
-                className="rounded-full bg-cta px-5 py-2.5 text-sm font-bold text-white transition hover:bg-cta-hover"
+                className="whitespace-nowrap rounded-full bg-cta px-5 py-2.5 text-sm font-bold text-white transition hover:bg-cta-hover"
               >
                 Book now
               </button>

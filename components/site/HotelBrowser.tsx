@@ -281,7 +281,7 @@ function HotelCard({ hotel: h, landmark, index }: { hotel: Hotel; landmark: stri
         </div>
         <p className="mt-2 text-xs text-muted-foreground">PKR per room, per night</p>
 
-        <div className="mt-auto flex items-end justify-between gap-3 pt-5">
+        <div className="mt-auto flex flex-wrap items-end justify-between gap-3 pt-5">
           <div>
             <p className="text-xs text-muted-foreground">From</p>
             <p className="text-xl font-extrabold text-primary">{formatPKR(lowestRate(h))}</p>
@@ -299,7 +299,7 @@ function HotelCard({ hotel: h, landmark, index }: { hotel: Hotel; landmark: stri
             <button
               type="button"
               onClick={() => openWith({ interest: "Hotels", message })}
-              className="rounded-full bg-cta px-5 py-2.5 text-sm font-bold text-white transition hover:bg-cta-hover"
+              className="whitespace-nowrap rounded-full bg-cta px-5 py-2.5 text-sm font-bold text-white transition hover:bg-cta-hover"
             >
               Book now
             </button>
