@@ -2,8 +2,9 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { ArrowUpDown, Building2, Bus, Check, Coffee, Footprints, MapPin, Star, X } from "lucide-react";
+import { ArrowUpDown, Bus, Check, Coffee, Footprints, MapPin, Star, X } from "lucide-react";
 import { cn } from "@/lib/utils";
+import HotelPhoto from "@/components/site/HotelPhoto";
 import { ROOM_TYPES, formatDistance, formatPKR, lowestRate, walkMinutes, type Hotel } from "@/lib/site/hotels";
 import { breakfastIncluded, hotelsIn, type CityId } from "@/lib/site/pricing";
 
@@ -18,9 +19,7 @@ const CITY_LANDMARK: Record<CityId, string> = {
 export function HotelSummary({ hotel, onChange }: { hotel: Hotel; onChange: () => void }) {
   return (
     <div className="mt-4 flex flex-col gap-4 rounded-2xl bg-gradient-to-br from-navy to-primary p-4 text-white sm:flex-row sm:items-center">
-      <span className="grid size-12 shrink-0 place-items-center rounded-xl bg-white/10">
-        <Building2 className="size-6" />
-      </span>
+      <HotelPhoto hotel={hotel} compact className="size-16 shrink-0 rounded-xl ring-2 ring-white/20" sizes="64px" />
       <div className="min-w-0 flex-1">
         <div className="flex flex-wrap items-center gap-2">
           <p className="font-bold leading-snug">{hotel.name}</p>
@@ -196,21 +195,9 @@ function HotelProfile({ hotel: h, selected, onSelect }: { hotel: Hotel; selected
         selected ? "border-cta shadow-lg shadow-cta/15" : "border-transparent hover:border-primary/30",
       )}
     >
+      <HotelPhoto hotel={h} className="h-40" sizes="(max-width: 768px) 100vw, 420px" />
       <div className="relative bg-gradient-to-br from-navy to-primary p-4 text-white">
-        <div className="flex items-start justify-between gap-3">
-          <span className="grid size-10 place-items-center rounded-xl bg-white/10">
-            <Building2 className="size-5" />
-          </span>
-          <span
-            className="flex items-center gap-0.5 rounded-full bg-white/10 px-2 py-1"
-            aria-label={`${h.stars} star hotel`}
-          >
-            {Array.from({ length: h.stars }).map((_, i) => (
-              <Star key={i} className="size-3 fill-cta text-cta" />
-            ))}
-          </span>
-        </div>
-        <h3 className="mt-3 font-bold leading-snug">{h.name}</h3>
+        <h3 className="font-bold leading-snug">{h.name}</h3>
         <p className="mt-0.5 flex items-center gap-1 text-xs text-white/70">
           <MapPin className="size-3.5" />
           {h.area}

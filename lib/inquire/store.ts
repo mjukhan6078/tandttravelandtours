@@ -7,27 +7,54 @@ export type { InquiryType, InquiryRecord } from "./types";
 const DATA_DIR = path.join(process.cwd(), ".data");
 const DATA_FILE = path.join(DATA_DIR, "inquiries.json");
 
-async function ensureStore() {
-  await fs.mkdir(DATA_DIR, { recursive: true });
+/**
+ * Writes run one at a time: concurrent read-modify-write cycles would otherwise
+ * interleave and corrupt the file, after which every inquiry fails.
+ */
+let queue: Promise<unknown> = Promise.resolve();
+
+async function readAll(): Promise<InquiryRecord[]> {
+  let raw: string;
   try {
-    await fs.access(DATA_FILE);
-  } catch {
-    await fs.writeFile(DATA_FILE, "[]\n", "utf8");
+    raw = await fs.readFile(DATA_FILE, "utf8");
+  } catch (err) {
+    if ((err as NodeJS.ErrnoException).code === "ENOENT") return [];
+    throw err;
   }
+  try {
+    const list = JSON.parse(raw || "[]");
+    if (Array.isArray(list)) return list as InquiryRecord[];
+  } catch {
+    // fall through
+  }
+  // Keep the unreadable file for recovery and start a fresh one, so new
+  // inquiries are still accepted.
+  const backup = path.join(DATA_DIR, `inquiries.corrupt-${Date.now()}.json`);
+  await fs.rename(DATA_FILE, backup);
+  console.error(`[inquire] ${DATA_FILE} was unreadable; moved it to ${backup}`);
+  return [];
 }
 
-export async function appendInquiry(
-  input: Omit<InquiryRecord, "id" | "createdAt">
-): Promise<InquiryRecord> {
-  await ensureStore();
-  const raw = await fs.readFile(DATA_FILE, "utf8");
-  const list = JSON.parse(raw || "[]") as InquiryRecord[];
+async function write(input: Omit<InquiryRecord, "id" | "createdAt">): Promise<InquiryRecord> {
+  await fs.mkdir(DATA_DIR, { recursive: true });
+  const list = await readAll();
   const record: InquiryRecord = {
     ...input,
     id: `inq_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
     createdAt: new Date().toISOString(),
   };
   list.push(record);
-  await fs.writeFile(DATA_FILE, `${JSON.stringify(list, null, 2)}\n`, "utf8");
+  // Write to a temp file and rename, so a crash mid-write never leaves half a file.
+  const tmp = `${DATA_FILE}.${process.pid}.tmp`;
+  await fs.writeFile(tmp, `${JSON.stringify(list, null, 2)}\n`, "utf8");
+  await fs.rename(tmp, DATA_FILE);
   return record;
+}
+
+export function appendInquiry(
+  input: Omit<InquiryRecord, "id" | "createdAt">
+): Promise<InquiryRecord> {
+  const run = queue.then(() => write(input));
+  queue = run.catch(() => undefined);
+  return run;
 }

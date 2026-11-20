@@ -14,7 +14,7 @@ import { ROOM_TYPES, hotels, type Hotel, type RoomType } from "./hotels";
 import { transportRoutes, transportVehicles, type TransportVehicle, type VehicleId } from "./transport";
 import { visaTypes } from "./visa";
 
-export const PRICING_IS_PLACEHOLDER = true;
+export const PRICING_IS_PLACEHOLDER = false;
 
 /** Bookable window, relative to today, and stay length limits. */
 export const BOOKING = {

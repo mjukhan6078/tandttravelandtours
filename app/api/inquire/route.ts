@@ -4,6 +4,9 @@ import type { InquiryType } from "@/lib/inquire/types";
 
 const TYPES: InquiryType[] = ["contact", "quote", "inquire"];
 
+/** Max characters per field. The Umrah builder's summary is the longest message. */
+const LIMITS = { name: 100, email: 200, phone: 30, interest: 100, message: 5000 };
+
 const rateMap = new Map<string, { count: number; resetAt: number }>();
 
 function rateLimit(ip: string): boolean {
@@ -71,15 +74,34 @@ export async function POST(request: Request) {
   if (!message || message.length < 5) {
     return NextResponse.json({ error: "Please enter a message." }, { status: 400 });
   }
+  if (
+    name.length > LIMITS.name ||
+    email.length > LIMITS.email ||
+    phone.length > LIMITS.phone ||
+    message.length > LIMITS.message ||
+    (interest?.length ?? 0) > LIMITS.interest
+  ) {
+    return NextResponse.json(
+      { error: "Some details are too long. Please shorten your message and try again." },
+      { status: 400 }
+    );
+  }
 
-  const record = await appendInquiry({
-    type: type as InquiryType,
-    name,
-    email,
-    phone,
-    message,
-    interest,
-  });
-
-  return NextResponse.json({ ok: true, id: record.id });
+  try {
+    const record = await appendInquiry({
+      type: type as InquiryType,
+      name,
+      email,
+      phone,
+      message,
+      interest,
+    });
+    return NextResponse.json({ ok: true, id: record.id });
+  } catch (err) {
+    console.error("[inquire] could not save inquiry", err);
+    return NextResponse.json(
+      { error: "We couldn't save your message. Please try again or message us on WhatsApp." },
+      { status: 500 }
+    );
+  }
 }

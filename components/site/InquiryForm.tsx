@@ -121,6 +121,7 @@ export default function InquiryForm({
                   onChange={(e) => setName(e.target.value)}
                   required
                   minLength={2}
+                  maxLength={100}
                   autoComplete="name"
                   placeholder="Your full name"
                   className={fieldClass}
@@ -146,6 +147,7 @@ export default function InquiryForm({
                   onChange={(e) => setPhone(e.target.value)}
                   required
                   minLength={7}
+                  maxLength={30}
                   autoComplete="tel"
                   placeholder="+92 300 0000000"
                   className={fieldClass}
@@ -187,6 +189,7 @@ export default function InquiryForm({
                 onChange={(e) => setMessage(e.target.value)}
                 required
                 minLength={5}
+                maxLength={5000}
                 rows={compact ? 4 : 5}
                 placeholder="Travel dates, number of travellers, hotel preference…"
                 className={cn(fieldClass, "h-auto resize-none py-3")}

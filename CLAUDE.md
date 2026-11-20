@@ -29,7 +29,7 @@ A public, marketing-only site for T&T Travel and Tours (Hajj/Umrah travel agency
 - **WhatsApp:** use `waLink(text)` from `lib/site/contact.ts` for prefilled chat links. Icons in content are string keys (`IconKey`) mapped to lucide icons in `components/site/icons.tsx`.
 - **UI:** shadcn (`radix-nova` style, lucide icons). Primitives are in `components/ui/`; add new ones with the shadcn CLI. Tailwind v4 is configured CSS-first in `app/globals.css`; there is no `tailwind.config`. Animation uses framer-motion (`components/AnimatedSection.tsx`). Path alias is `@/*`, which maps to the repo root.
 - **Design tokens** (in `app/globals.css`, matched to the logo): `primary` royal blue `#1846a3`, `brand-cyan` `#1fa5c9`, `navy` `#0a1f44` for dark bands, `cta` orange `#f7931e` for calls to action, `surface` `#f4f7fc` for alternate sections. Custom utilities: `container-site` (max 1240px + gutters), `eyebrow` (section kicker), `no-scrollbar`. The 2026-09-15 spec's green palette is superseded.
-- **Images:** `next/image` in Next 16 uses `preload` (not the deprecated `priority`), and only quality 75 is allowed by default. Package flyers live in `public/packages/` and are listed in `packageFlyers` in `content.ts`.
+- **Images:** `next/image` in Next 16 uses `preload` (not the deprecated `priority`), and only quality 75 is allowed by default. Package flyers live in `public/packages/` and are listed in `packageFlyers` in `content.ts`. Hotel photos live in `public/hotels/` and are set per hotel via the `image` field in `lib/site/hotels.ts`; `components/site/HotelPhoto.tsx` shows a "Photo coming soon" placeholder for hotels without one. Openly licensed photos (CC BY / BY-SA) must set `photoCredit`, which renders the author and licence on the card.
 
 ## Notes
 

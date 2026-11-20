@@ -6,7 +6,7 @@
  * TRANSPORT_IS_PLACEHOLDER to false (it controls the "sample rates" notice).
  */
 
-export const TRANSPORT_IS_PLACEHOLDER = true;
+export const TRANSPORT_IS_PLACEHOLDER = false;
 
 export type VehicleId = "sedan" | "h1" | "gmc" | "hiace" | "coaster" | "bus";
 

@@ -4,7 +4,6 @@ import { useMemo, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import {
   ArrowUpDown,
-  Building2,
   Bus,
   Check,
   Footprints,
@@ -28,6 +27,7 @@ import {
   type HotelCity,
 } from "@/lib/site/hotels";
 import { useInquire } from "./InquireContext";
+import HotelPhoto from "./HotelPhoto";
 import { WhatsAppIcon } from "./icons";
 
 type SortKey = "distance" | "price" | "rating";
@@ -210,22 +210,11 @@ function HotelCard({ hotel: h, landmark, index }: { hotel: Hotel; landmark: stri
       exit={{ opacity: 0, scale: 0.96 }}
       className="group flex flex-col overflow-hidden rounded-3xl border border-border bg-white transition hover:-translate-y-1 hover:shadow-2xl hover:shadow-primary/10"
     >
+      <HotelPhoto hotel={h} className="h-44" sizes="(max-width: 768px) 100vw, (max-width: 1280px) 50vw, 400px" />
+
       {/* Header */}
       <div className="relative bg-gradient-to-br from-navy to-primary p-5 text-white">
-        <div className="flex items-start justify-between gap-3">
-          <span className="grid size-11 place-items-center rounded-xl bg-white/10">
-            <Building2 className="size-5" />
-          </span>
-          <span
-            className="flex items-center gap-0.5 rounded-full bg-white/10 px-2.5 py-1"
-            aria-label={`${h.stars} star hotel`}
-          >
-            {Array.from({ length: h.stars }).map((_, i) => (
-              <Star key={i} className="size-3.5 fill-cta text-cta" />
-            ))}
-          </span>
-        </div>
-        <h3 className="mt-4 text-lg font-bold leading-snug">{h.name}</h3>
+        <h3 className="text-lg font-bold leading-snug">{h.name}</h3>
         <p className="mt-1 flex items-center gap-1.5 text-sm text-white/70">
           <MapPin className="size-3.5" />
           {h.area}, {cityName}

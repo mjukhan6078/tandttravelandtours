@@ -6,7 +6,7 @@
  * or set FLIGHTS_ARE_PLACEHOLDER to false once real fares are in.
  */
 
-export const FLIGHTS_ARE_PLACEHOLDER = true;
+export const FLIGHTS_ARE_PLACEHOLDER = false;
 
 export type Airport = { code: string; city: string; region: string };
 

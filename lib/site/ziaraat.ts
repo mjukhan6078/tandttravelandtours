@@ -6,7 +6,7 @@
  * controls the "sample rates" notice).
  */
 
-export const ZIARAAT_IS_PLACEHOLDER = true;
+export const ZIARAAT_IS_PLACEHOLDER = false;
 
 export type ZiaraatCity = "makkah" | "madinah";
 

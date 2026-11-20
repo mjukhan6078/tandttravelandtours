@@ -6,7 +6,7 @@
  * change often), then set VISA_IS_PLACEHOLDER to false (it controls the notice).
  */
 
-export const VISA_IS_PLACEHOLDER = true;
+export const VISA_IS_PLACEHOLDER = false;
 
 export type Traveller = "adult" | "child" | "infant";
 

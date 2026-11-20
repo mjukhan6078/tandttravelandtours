@@ -7,7 +7,7 @@
  * controls the "sample rates" notice).
  */
 
-export const HOTELS_ARE_PLACEHOLDER = true;
+export const HOTELS_ARE_PLACEHOLDER = false;
 
 export type HotelCity = "makkah" | "madinah";
 
@@ -39,6 +39,12 @@ export type Hotel = {
   /** True when guests normally use a shuttle rather than walk. */
   shuttle?: boolean;
   perks: string[];
+  /** Photo under public/hotels/. Cards show a placeholder until one is added. */
+  image?: string;
+  /** CSS object-position for the photo, e.g. "center 20%" to keep a tower's top in frame. */
+  imagePosition?: string;
+  /** Required for openly licensed photos (CC BY / BY-SA): shown on the card. */
+  photoCredit?: { author: string; license: string; licenseUrl: string; source: string };
   /** PKR per room per night. */
   rates: Record<RoomType, number>;
 };
@@ -48,6 +54,14 @@ export const hotels: Hotel[] = [
   {
     id: "fairmont-makkah",
     name: "Fairmont Makkah Clock Royal Tower",
+    image: "/hotels/fairmont-makkah.jpg",
+    imagePosition: "center 18%",
+    photoCredit: {
+      author: "Samira Zaman",
+      license: "CC BY-SA 2.0",
+      licenseUrl: "https://creativecommons.org/licenses/by-sa/2.0/",
+      source: "https://www.flickr.com/photos/44083360@N00/7633925640",
+    },
     city: "makkah",
     area: "Abraj Al Bait",
     stars: 5,
@@ -162,6 +176,7 @@ export const hotels: Hotel[] = [
   {
     id: "anwar-al-madinah",
     name: "Anwar Al Madinah Mövenpick",
+    image: "/hotels/anwar-al-madinah.jpg",
     city: "madinah",
     area: "Central North",
     stars: 5,
