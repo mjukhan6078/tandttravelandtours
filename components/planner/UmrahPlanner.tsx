@@ -165,9 +165,11 @@ export default function UmrahPlanner() {
   const shortOnBeds = state.stops.some((s) => s.hotelId && bedsIn(s.rooms) < guests);
 
   const summaryText = [
-    `Route: ${AIRPORT[state.stops[0].city].code} → ${state.stops
-      .map((s) => `${CITY_LABEL[s.city]} (${s.nights}n)`)
-      .join(" → ")} → ${AIRPORT[state.stops[state.stops.length - 1].city].code}`,
+    `Route: Karachi → ${AIRPORT[state.stops[0].city].name} (${AIRPORT[state.stops[0].city].code}) → ${state.stops
+      .map((s) => `${CITY_LABEL[s.city]} ${s.nights} ${s.nights === 1 ? "night" : "nights"}`)
+      .join(" → ")} → ${AIRPORT[state.stops[state.stops.length - 1].city].name} (${
+      AIRPORT[state.stops[state.stops.length - 1].city].code
+    }) → Karachi`,
     dateValid
       ? `Dates: ${shortDate(state.startDate)} – ${shortDate(endDate)} (${totalNights} nights)`
       : `Dates: flexible (${totalNights} nights)`,
