@@ -57,9 +57,9 @@ import {
   type RouteId,
   type Stop,
 } from "@/lib/site/pricing";
-import { ROOM_TYPES, type RoomType } from "@/lib/site/hotels";
+import { ROOM_TYPES, formatDistance, type RoomType } from "@/lib/site/hotels";
 import { transportRoutes, transportVehicles, type VehicleId } from "@/lib/site/transport";
-import { emailInquiry, openWhatsAppInquiry } from "@/lib/inquire/client";
+import { UMRAH_BUILDER_INTRO, emailInquiry, openWhatsAppInquiry } from "@/lib/inquire/client";
 import QuerySent, { SendButtons, submittedChannel, type SentState } from "@/components/site/QuerySent";
 import { HotelPickerModal, HotelSummary } from "./HotelPicker";
 import { AnimatedPKR } from "./PlannerParts";
@@ -164,39 +164,66 @@ export default function UmrahPlanner() {
     state.comfort === "custom" ? "Custom" : COMFORT_LEVELS.find((c) => c.id === state.comfort)!.name;
   const shortOnBeds = state.stops.some((s) => s.hotelId && bedsIn(s.rooms) < guests);
 
+  // The query sent to T&T (email and WhatsApp). "*HEADING*" lines start sections (bold in
+  // WhatsApp, headings in the email) and "Label: value" lines become table rows.
+  const firstCity = state.stops[0].city;
+  const lastCity = state.stops[state.stops.length - 1].city;
+  const everyone = state.adults + state.children + state.infants;
+  const transfers = transfersFor(state.stops);
   const summaryText = [
-    `Route: Karachi → ${AIRPORT[state.stops[0].city].name} (${AIRPORT[state.stops[0].city].code}) → ${state.stops
-      .map((s) => `${CITY_LABEL[s.city]} ${s.nights} ${s.nights === 1 ? "night" : "nights"}`)
-      .join(" → ")} → ${AIRPORT[state.stops[state.stops.length - 1].city].name} (${
-      AIRPORT[state.stops[state.stops.length - 1].city].code
-    }) → Karachi`,
+    "*TRIP*",
+    `Route: Karachi → ${AIRPORT[firstCity].name} (${AIRPORT[firstCity].code}) → ${state.stops
+      .map((s) => CITY_LABEL[s.city])
+      .join(" → ")} → ${AIRPORT[lastCity].name} (${AIRPORT[lastCity].code}) → Karachi`,
     dateValid
-      ? `Dates: ${shortDate(state.startDate)} – ${shortDate(endDate)} (${totalNights} nights)`
-      : `Dates: flexible (${totalNights} nights)`,
-    `Travellers: ${state.adults} adults, ${state.children} children${
-      state.children ? ` (ages ${state.childAges.join(", ")})` : ""
-    }, ${state.infants} infants · Nationality: ${state.nationality}`,
-    ...state.stops.map((s, i) => {
+      ? `Dates: ${longDate(state.startDate)} to ${longDate(endDate)} (${plural(totalNights, "night")})`
+      : `Dates: flexible, ${plural(totalNights, "night")}`,
+    `Travellers: ${[
+      plural(state.adults, "adult"),
+      state.children
+        ? `${plural(state.children, "child", "children")} (age${state.children > 1 ? "s" : ""} ${state.childAges.join(", ")})`
+        : "",
+      state.infants ? `${plural(state.infants, "infant")} (under 2)` : "",
+    ]
+      .filter(Boolean)
+      .join(", ")}${everyone > state.adults ? ` · ${plural(everyone, "person", "people")} in total` : ""}`,
+    `Nationality: ${state.nationality}`,
+    "",
+    "*HOTELS*",
+    ...state.stops.map((s) => {
       const h = hotelById(s.hotelId);
-      if (!h) return `Stop ${i + 1} ${CITY_LABEL[s.city]}: transit only`;
+      const where = `${CITY_LABEL[s.city]}, ${plural(s.nights, "night")}`;
+      if (!h) return `${where}: no hotel (transit only)`;
       const rooms = ROOM_TYPES.filter((r) => s.rooms[r.id])
-        .map((r) => `${s.rooms[r.id]} ${r.label.toLowerCase()}`)
-        .join(", ");
-      const bf = breakfastIncluded(h) ? "breakfast included" : s.breakfast ? "with breakfast" : "room only";
-      return `Stop ${i + 1} ${CITY_LABEL[s.city]}: ${h.name} · ${rooms} · ${bf}`;
+        .map((r) => `${s.rooms[r.id]} ${r.label.toLowerCase()} room${s.rooms[r.id] > 1 ? "s" : ""}`)
+        .join(" + ");
+      const bf = breakfastIncluded(h) ? "breakfast included" : s.breakfast ? "breakfast added" : "room only";
+      return `${where}: ${h.name} (${h.stars}★, ${formatDistance(h.distanceM)} from ${
+        s.city === "makkah" ? "Masjid al-Haram" : "Masjid an-Nabawi"
+      }${
+        h.shuttle ? ", shuttle" : ""
+      }) · ${rooms || "no rooms chosen"} · ${bf}`;
     }),
+    "",
+    "*SERVICES*",
     state.transportMode === "full"
-      ? `Transport: full · ${state.cars} × ${vehicleById(state.vehicleId).name}`
-      : `Transport: selective · ${
-          transfersFor(state.stops)
+      ? `Transport: ${state.cars} × ${vehicleById(state.vehicleId).name} for all ${transfers.length} transfers (airport, between cities, airport)`
+      : `Transport: ${
+          transfers
             .filter((t) => state.legVehicles[t.id])
-            .map((t) => `${t.label} (${vehicleById(state.legVehicles[t.id] as VehicleId).name})`)
-            .join("; ") || "none"
+            .map((t) => `${t.label} by ${vehicleById(state.legVehicles[t.id] as VehicleId).name}`)
+            .join("; ") || "not needed"
         }`,
-    `Ziaraat: ${state.ziaraat.length ? state.ziaraat.map((c) => CITY_LABEL[c]).join(", ") : "no"} · Visa: ${
-      state.visa ? "yes" : "no"
-    } · Flights: ${state.flights ? "yes" : "no"}`,
-    `Estimated total: ${formatPKR(quote.total)} (${formatPKR(quote.perPerson)} per person)`,
+    `Umrah visa: ${state.visa ? `needed for ${plural(everyone, "person", "people")}` : "not needed"}`,
+    `Ziaraat: ${state.ziaraat.length ? state.ziaraat.map((c) => CITY_LABEL[c]).join(" and ") : "not needed"}`,
+    `Flights: ${state.flights ? "return flights from Karachi needed" : "not needed (has own tickets)"}`,
+    "",
+    "*PRICE ESTIMATE*",
+    ...quote.lines
+      .filter((l) => l.amount > 0)
+      .map((l) => `${l.label} (${l.detail.replace(/ · stop \d+/, "")}): ${formatPKR(l.amount)}`),
+    `Total: ${formatPKR(quote.total)}`,
+    `Per person: ${formatPKR(quote.perPerson)}${state.infants ? " (infants not counted)" : ""}`,
   ].join("\n");
 
   const pass = (
@@ -1269,7 +1296,7 @@ function RequestDialog({
       name,
       phone,
       interest: "Umrah",
-      message: `Umrah builder request\n${summaryText}`,
+      message: `${UMRAH_BUILDER_INTRO}\n\n${summaryText}`,
     };
     if (submittedChannel(e) === "whatsapp") {
       // Before any await, so the browser lets the WhatsApp tab open.
@@ -1338,4 +1365,18 @@ function RequestDialog({
       )}
     </AnimatePresence>
   );
+}
+
+function plural(n: number, word: string, many = `${word}s`): string {
+  return `${n} ${n === 1 ? word : many}`;
+}
+
+/** "Thu, 10 Dec 2026". */
+function longDate(iso: string): string {
+  return new Date(`${iso}T00:00:00`).toLocaleDateString("en-GB", {
+    weekday: "short",
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  });
 }

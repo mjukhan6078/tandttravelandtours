@@ -1,5 +1,6 @@
 import { waLink } from "@/lib/site/contact";
 import type { InquiryChannel, InquiryType } from "./types";
+export { UMRAH_BUILDER_INTRO } from "./types";
 
 export type InquiryPayload = {
   type: InquiryType;

@@ -1,3 +1,6 @@
+/** First line of an Umrah builder query; the email uses it to tell builder queries apart. */
+export const UMRAH_BUILDER_INTRO = "I built this Umrah package on your website:";
+
 export type InquiryType = "contact" | "quote" | "inquire";
 
 export type InquiryChannel = "email" | "whatsapp";
