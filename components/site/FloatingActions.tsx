@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
 import { AnimatePresence, motion } from "framer-motion";
 import { ArrowUp, X } from "lucide-react";
-import { waLink, WHATSAPP_NAME } from "@/lib/site/contact";
+import { pageWhatsAppText, waLink, WHATSAPP_NAME } from "@/lib/site/contact";
 import { WhatsAppIcon } from "./icons";
 import { cn } from "@/lib/utils";
 
@@ -12,7 +12,8 @@ export default function FloatingActions() {
   const [showTop, setShowTop] = useState(false);
   const [bubble, setBubble] = useState(false);
   // The Umrah planner has a fixed estimate bar at the bottom on mobile.
-  const raised = usePathname() === "/umrah-planner";
+  const pathname = usePathname();
+  const raised = pathname === "/umrah-planner";
 
   useEffect(() => {
     const onScroll = () => setShowTop(window.scrollY > 600);
@@ -70,7 +71,7 @@ export default function FloatingActions() {
       </AnimatePresence>
 
       <a
-        href={waLink("Assalam o Alaikum, I'd like to know more about your packages.")}
+        href={waLink(pageWhatsAppText(pathname))}
         target="_blank"
         rel="noopener noreferrer"
         aria-label="Chat with us on WhatsApp"
