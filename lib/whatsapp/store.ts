@@ -1,10 +1,10 @@
 import { promises as fs } from "fs";
 import path from "path";
-import type Anthropic from "@anthropic-ai/sdk";
+import type { ChatMessage } from "./llm";
 
 /**
  * One file per customer under .data/whatsapp/, holding the chat history the
- * assistant replays to Claude. The agent handles one customer at a time, so
+ * assistant sends to the model. The agent handles one customer at a time, so
  * a file never has two writers.
  */
 
@@ -13,8 +13,8 @@ const DIR = path.join(process.cwd(), ".data", "whatsapp");
 export type Conversation = {
   waId: string;
   name?: string;
-  /** Exactly what was sent to and returned by Claude, so replays stay byte-identical. */
-  messages: Anthropic.Beta.BetaMessageParam[];
+  /** The chat as sent to the model, without the system prompt. */
+  messages: ChatMessage[];
   /** While set and in the future, the team is handling the chat and the bot stays quiet. */
   pausedUntil?: string;
   createdAt: string;

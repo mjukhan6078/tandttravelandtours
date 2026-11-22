@@ -1,4 +1,3 @@
-import type Anthropic from "@anthropic-ai/sdk";
 import { emailInquiry, isEmailConfigured } from "@/lib/inquire/mailer";
 import { appendInquiry } from "@/lib/inquire/store";
 import { ROOM_TYPES, type RoomType } from "@/lib/site/hotels";
@@ -17,6 +16,7 @@ import {
   type Stop,
 } from "@/lib/site/pricing";
 import { transportVehicles, type VehicleId } from "@/lib/site/transport";
+import type { ToolDefinition } from "./llm";
 
 /**
  * Tools the WhatsApp assistant can call. quote_umrah_trip runs the same maths
@@ -40,12 +40,11 @@ const HANDOFF_REASONS = [
   "other",
 ] as const;
 
-export const TOOLS: Anthropic.Beta.BetaTool[] = [
+const TOOL_SPECS: { name: string; description: string; input_schema: Record<string, unknown> }[] = [
   {
     name: "quote_umrah_trip",
     description:
       "Works out an estimated price in PKR for a custom Umrah trip, using T&T's hotel, transport, visa, ziaraat and flight rates (the same maths as the website's package builder). Call it whenever the customer wants a price for their own dates, nights, hotels or group, instead of calculating yourself. Returns the line items, total and per-person price, plus any problems with the request to fix with the customer.",
-    strict: true,
     input_schema: {
       type: "object",
       additionalProperties: false,
@@ -98,7 +97,6 @@ export const TOOLS: Anthropic.Beta.BetaTool[] = [
     name: "handoff_to_agent",
     description:
       "Hands the chat to a T&T team member: saves the customer's details as a lead, emails the team, and stops the automatic replies in this chat for a while. Use it when the customer wants to book, pay or change something, needs something not in the reference (flight fares, Hajj, group rates), has a complaint, or asks for a person. After calling it, tell the customer a team member will reply in this chat soon.",
-    strict: true,
     input_schema: {
       type: "object",
       additionalProperties: false,
@@ -115,6 +113,11 @@ export const TOOLS: Anthropic.Beta.BetaTool[] = [
     },
   },
 ];
+
+export const TOOLS: ToolDefinition[] = TOOL_SPECS.map((t) => ({
+  type: "function",
+  function: { name: t.name, description: t.description, parameters: t.input_schema },
+}));
 
 /* ───────────── quote ───────────── */
 

@@ -18,11 +18,10 @@ export const whatsappConfig = {
   /** How long the bot stays quiet in a chat after handing it to the team. */
   handoffPauseHours: () => Number(process.env.WHATSAPP_HANDOFF_PAUSE_HOURS || 12),
 
-  /** Claude in Amazon Bedrock. Credentials come from AWS_BEARER_TOKEN_BEDROCK or the AWS credential chain. */
+  /** Amazon Bedrock. The API key comes from AWS_BEARER_TOKEN_BEDROCK. */
   awsRegion: () => process.env.AWS_REGION || process.env.AWS_DEFAULT_REGION || "us-east-1",
-  model: () => process.env.BEDROCK_MODEL || "anthropic.claude-opus-5-5",
-  /** Used when the main model declines a message; empty to turn off. */
-  fallbackModel: () => process.env.BEDROCK_FALLBACK_MODEL ?? "anthropic.claude-opus-4-8",
+  /** Any chat model on Bedrock's OpenAI-compatible endpoint. */
+  model: () => process.env.BEDROCK_MODEL || "qwen.qwen3-235b-a22b-2507",
 };
 
 export function isWhatsAppConfigured(): boolean {

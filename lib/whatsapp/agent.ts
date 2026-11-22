@@ -1,14 +1,14 @@
-import { AnthropicBedrockMantle } from "@anthropic-ai/bedrock-sdk";
-import Anthropic, { BetaFallbackState, betaRefusalFallbackMiddleware } from "@anthropic-ai/sdk";
 import { markReadWithTyping, sendText, type IncomingMessage } from "./cloud-api";
 import { whatsappConfig } from "./config";
 import { systemPrompt } from "./knowledge";
+import { chatCompletion, type ChatMessage } from "./llm";
 import { loadConversation, saveConversation, type Conversation } from "./store";
 import { TOOLS, runTool } from "./tools";
 
 /**
- * The WhatsApp auto-responder: Claude in Amazon Bedrock, with the site's data
- * in the system prompt and two tools (quotes, handover to the team).
+ * The WhatsApp auto-responder: a chat model on Amazon Bedrock (Qwen by
+ * default), with the site's data in the system prompt and two tools (quotes,
+ * handover to the team).
  *
  * Each customer's messages are handled one batch at a time, in order. Messages
  * that arrive while a reply is being written are answered together next.
@@ -25,31 +25,6 @@ const STALE_MS = 30 * 24 * 60 * 60 * 1000;
 const SORRY =
   "Sorry, I couldn't answer that just now. A member of our team will reply here shortly. JazakAllah for your patience.";
 
-let client: AnthropicBedrockMantle | null = null;
-
-function getClient(): AnthropicBedrockMantle {
-  if (client) return client;
-  const fallback = whatsappConfig.fallbackModel();
-  client = new AnthropicBedrockMantle({
-    awsRegion: whatsappConfig.awsRegion(),
-    // If the main model declines a message (a safety false positive), retry it on the fallback model.
-    middleware: fallback ? [betaRefusalFallbackMiddleware([{ model: fallback }])] : [],
-  });
-  return client;
-}
-
-/** Keeps later turns on the fallback model once it has taken over a chat. */
-const fallbackStates = new Map<string, BetaFallbackState>();
-
-function fallbackStateFor(waId: string): BetaFallbackState {
-  let state = fallbackStates.get(waId);
-  if (!state) {
-    state = new BetaFallbackState();
-    fallbackStates.set(waId, state);
-  }
-  return state;
-}
-
 const karachiTime = (d: Date) =>
   d.toLocaleString("en-GB", {
     timeZone: "Asia/Karachi",
@@ -61,82 +36,62 @@ const karachiTime = (d: Date) =>
     minute: "2-digit",
   });
 
-/**
- * Drops old turns once a chat gets long. The kept part starts at a customer
- * message, and every earlier thinking block is removed: Claude only accepts a
- * replayed thinking block when everything before it is unchanged.
- */
-function trimHistory(messages: Anthropic.Beta.BetaMessageParam[]): Anthropic.Beta.BetaMessageParam[] {
+/** Drops old turns once a chat gets long. The kept part starts at a customer message. */
+function trimHistory(messages: ChatMessage[]): ChatMessage[] {
   if (messages.length <= MAX_MESSAGES) return messages;
-  const isCustomerTurn = (m: Anthropic.Beta.BetaMessageParam) =>
-    m.role === "user" &&
-    (typeof m.content === "string" || m.content.every((b) => b.type === "text"));
   let start = messages.length - KEEP_MESSAGES;
-  while (start < messages.length && !isCustomerTurn(messages[start])) start++;
-  if (start >= messages.length) return [];
-  return messages.slice(start).map((m) =>
-    m.role === "assistant" && Array.isArray(m.content)
-      ? { ...m, content: m.content.filter((b) => b.type !== "thinking" && b.type !== "redacted_thinking") }
-      : m
-  );
+  while (start < messages.length && messages[start].role !== "user") start++;
+  return messages.slice(start);
 }
 
-function textOf(content: Anthropic.Beta.BetaContentBlock[]): string {
-  return content
-    .filter((b): b is Anthropic.Beta.BetaTextBlock => b.type === "text")
-    .map((b) => b.text)
-    .join("\n\n")
+/**
+ * Turns Markdown the model may still write into WhatsApp formatting:
+ * **bold** → *bold*, headings → bold lines, no trailing spaces.
+ */
+function toWhatsApp(text: string): string {
+  return text
+    .replace(/\*\*(.+?)\*\*/g, "*$1*")
+    .replace(/__(.+?)__/g, "_$1_")
+    .replace(/^#{1,6}\s+(.+)$/gm, "*$1*")
+    .replace(/[ \t]+$/gm, "")
+    .replace(/\n{3,}/g, "\n\n")
     .trim();
 }
 
-/** Runs Claude over the conversation until it has a reply for the customer. */
-async function respond(conv: Conversation, onHandoff: () => void): Promise<string> {
+/** Runs the model over the conversation until it has a reply for the customer. Exported for local testing. */
+export async function respond(conv: Conversation, onHandoff: () => void): Promise<string> {
   const ctx = { waId: conv.waId, profileName: conv.name, onHandoff };
 
   for (let round = 0; round < MAX_ROUNDS; round++) {
-    const response = await getClient().beta.messages.create(
-      {
-        model: whatsappConfig.model(),
-        max_tokens: 16000,
-        // Caches the system prompt and the chat so far; each new turn reads it back cheaply.
-        cache_control: { type: "ephemeral" },
-        system: systemPrompt(),
-        tools: TOOLS,
-        messages: conv.messages,
-        output_config: { effort: "medium" },
-      },
-      { fallbackState: fallbackStateFor(conv.waId) }
+    const { message, finishReason } = await chatCompletion(
+      [{ role: "system", content: systemPrompt() }, ...conv.messages],
+      TOOLS
     );
 
-    // Store the whole reply, thinking blocks included, so the next request replays it unchanged.
-    conv.messages.push({ role: "assistant", content: response.content });
-
-    if (response.stop_reason === "refusal") {
-      // Every model in the chain declined. Drop the partial reply; the caller hands over.
-      console.warn("[whatsapp] model declined", conv.waId, response.stop_details);
-      conv.messages.pop();
-      return "";
-    }
-
-    if (response.stop_reason === "pause_turn") continue;
-
-    if (response.stop_reason === "tool_use") {
-      const calls = response.content.filter((b): b is Anthropic.Beta.BetaToolUseBlock => b.type === "tool_use");
-      const results: Anthropic.Beta.BetaToolResultBlockParam[] = [];
-      for (const call of calls) {
-        const r = await runTool(call.name, call.input, ctx);
-        results.push({ type: "tool_result", tool_use_id: call.id, content: r.content, is_error: r.isError });
+    if (message.tool_calls?.length) {
+      if (finishReason === "length") {
+        // Cut off mid tool call: the arguments are incomplete.
+        return "";
       }
-      conv.messages.push({ role: "user", content: results });
+      conv.messages.push(message);
+      for (const call of message.tool_calls) {
+        let input: unknown;
+        try {
+          input = JSON.parse(call.function.arguments || "{}");
+        } catch {
+          input = null;
+        }
+        const r = input
+          ? await runTool(call.function.name, input, ctx)
+          : { content: "The tool arguments were not valid JSON. Call the tool again with valid JSON." };
+        conv.messages.push({ role: "tool", tool_call_id: call.id, content: r.content });
+      }
       continue;
     }
 
-    if (response.content.some((b) => b.type === "tool_use")) {
-      // Cut off mid tool call (max_tokens): an unanswered tool_use would break the next request.
-      conv.messages.pop();
-      return "";
-    }
-    return textOf(response.content);
+    const text = toWhatsApp(message.content ?? "");
+    if (text) conv.messages.push({ role: "assistant", content: text });
+    return text;
   }
 
   console.warn("[whatsapp] too many tool rounds", conv.waId);
@@ -149,7 +104,6 @@ async function handleBatch(batch: IncomingMessage[]): Promise<void> {
   let conv = await loadConversation(waId);
   if (Date.now() - Date.parse(conv.updatedAt) > STALE_MS) {
     conv = { ...conv, messages: [], pausedUntil: undefined };
-    fallbackStates.delete(waId);
   }
   if (name) conv.name = name;
 
@@ -163,7 +117,7 @@ async function handleBatch(batch: IncomingMessage[]): Promise<void> {
   }
   lines.push(...batch.map((m) => m.text));
   conv.messages = trimHistory(conv.messages);
-  conv.messages.push({ role: "user", content: [{ type: "text", text: lines.join("\n") }] });
+  conv.messages.push({ role: "user", content: lines.join("\n") });
 
   if (paused || !whatsappConfig.enabled()) {
     // The team is answering (or the bot is switched off): keep the history, don't reply.
@@ -182,14 +136,14 @@ async function handleBatch(batch: IncomingMessage[]): Promise<void> {
       handedOff = true;
     });
   } catch (err) {
-    console.error("[whatsapp] Claude request failed", waId, err);
+    console.error("[whatsapp] model request failed", waId, err);
   }
 
   if (!reply) {
     reply = SORRY;
     handedOff = true;
     // Record the apology so the next turn knows what the customer was told.
-    conv.messages.push({ role: "assistant", content: [{ type: "text", text: SORRY }] });
+    conv.messages.push({ role: "assistant", content: SORRY });
   }
   if (handedOff) {
     conv.pausedUntil = new Date(Date.now() + whatsappConfig.handoffPauseHours() * 3_600_000).toISOString();
